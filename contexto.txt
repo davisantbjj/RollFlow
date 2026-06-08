@@ -1,0 +1,217 @@
+📱 SAAS PARA ACADEMIAS DE LUTAS (FOCO EM JIU-JITSU)
+🧠 VISÃO DO PRODUTO
+
+Plataforma mobile (Android + iOS) para gestão completa de academias de lutas, com foco em:
+
+Operação (presença, turmas, aulas)
+Financeiro (mensalidades, cobrança)
+Evolução do aluno (faixa, grau, desempenho)
+Comunicação (feed, avisos, feedback)
+
+Construído com:
+
+Expo (mobile)
+React Native
+Backend em Node.js
+👥 TIPOS DE USUÁRIOS
+🔴 MASTER (Dono da academia)
+
+Controle total da academia:
+
+Financeiro
+Usuários
+Configurações
+Relatórios
+🟠 ADMIN / PROFESSOR
+Gerenciar turmas
+Chamada de presença
+Criar planos de aula
+Avaliar alunos
+Dar feedback
+🔵 ALUNO / CLIENTE
+Ver aulas
+Ver progresso
+Pagar mensalidade
+Interagir no feed
+🟢 RESPONSÁVEL (pais)
+Acompanhar aluno menor
+Receber feedback
+Ver evolução
+🧩 MÓDULOS DO SISTEMA
+📅 1. GESTÃO DE AULAS E TURMAS
+Funcionalidades:
+Criar turmas:
+Infantil / Adulto
+Iniciante / Avançado
+Horários e dias
+Vincular alunos à turma
+Vincular professor à turma
+📖 Planejamento de aula
+
+Professor pode cadastrar:
+
+Tipo de técnica:
+Guarda
+Passagem
+Finalização
+Defesa
+Lista de técnicas por aula
+Nível da aula
+
+👉 Aluno vê antes da aula (diferencial forte)
+
+✅ 2. CONTROLE DE PRESENÇA
+Métodos:
+Check-in manual pelo professor
+Check-in pelo aluno (QR code futuramente)
+Dados registrados:
+Data
+Aula
+Presente / faltou
+📊 Uso dos dados:
+Frequência do aluno
+Base para progressão de faixa
+📈 3. PROGRESSÃO DO ALUNO (DIFERENCIAL)
+
+Sistema inteligente baseado em:
+
+Presença (%)
+Avaliação do professor
+Tempo de treino
+🔥 Barra de progresso:
+Mostra:
+% para próximo grau
+% para próxima faixa
+
+Configuração:
+
+Professor define regras (ex: 75% presença + avaliação positiva)
+📝 Avaliação do professor:
+Técnica
+Disciplina
+Evolução
+👨‍👩‍👧 4. FEEDBACK PARA RESPONSÁVEIS
+
+Para menores:
+
+Professor escreve feedback individual
+Histórico de feedbacks
+Notificação para os pais
+💰 5. FINANCEIRO (CORE DO SAAS)
+Planos:
+Mensal
+Trimestral
+Anual
+Funcionalidades:
+Geração automática de cobrança
+Status:
+Pago
+Pendente
+Atrasado
+🔔 Notificações:
+5 dias antes
+No dia
+Pós-vencimento
+🔒 Regras:
+Bloqueio automático:
+App
+Acesso às aulas
+
+(Configuração pelo admin)
+
+📲 6. CADASTRO E AQUISIÇÃO DE CLIENTES
+Usuário pode:
+Baixar app
+Criar conta
+Sem vínculo inicial:
+Navega no app
+Agenda aula experimental
+Admin:
+Aprova vínculo com academia
+📰 7. FEED (ENGAJAMENTO)
+Tipo “rede social interna”
+
+Professor/Admin pode postar:
+
+Fotos de treino
+Eventos
+Avisos
+Funcionalidades:
+Curtir
+Comentar
+Compartilhar:
+
+👉 Instagram Stories / WhatsApp
+
+📌 Avisos fixados:
+Comunicados importantes
+Fixados no topo
+🔔 8. NOTIFICAÇÕES
+
+Push notifications para:
+
+Aula próxima
+Mensalidade
+Feedback
+Avisos
+🏢 9. MULTI-EMPRESA (MULTI-TENANT)
+Estrutura:
+Base única
+Cada academia isolada por ID
+Permite:
+Escalar SaaS
+Vender para várias academias
+📊 10. DASHBOARD (MASTER)
+Métricas:
+Alunos ativos
+Inadimplência
+Frequência média
+Receita mensal
+🔐 11. PERMISSÕES
+
+Controle granular:
+
+Professor não acessa financeiro
+Aluno só vê seus dados
+🧱 ESTRUTURA TÉCNICA (ALTO NÍVEL)
+📱 Mobile
+Expo
+Navegação: React Navigation
+Estado: Zustand ou Redux
+🌐 Backend
+Node.js
+API REST (ou GraphQL)
+🗄️ Banco
+PostgreSQL
+
+Principais tabelas:
+
+users
+academies
+classes (turmas)
+attendances
+payments
+plans
+evaluations
+feedbacks
+☁️ Infra
+AWS / Railway / Render
+Storage: imagens do feed
+🧠 DIFERENCIAL DO PRODUTO
+
+Você não está criando só um sistema.
+
+Você está criando:
+
+👉 Um sistema de evolução do atleta
+
+Isso é MUITO mais forte do que:
+
+“app de academia”
+“controle de mensalidade”
+💣 POSSÍVEL NOME (IDEIAS)
+RollFlow
+Faixa+
+TatamePro
+Gradus
+FlowJiu

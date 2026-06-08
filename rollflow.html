@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>RollFlow — BJJ Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --black: #0a0a0a;
+    --dark: #111318;
+    --card: #181c24;
+    --card2: #1e2330;
+    --border: #2a2f3d;
+    --gold: #e8b84b;
+    --gold2: #f5d07a;
+    --red: #e84b4b;
+    --blue: #4b7ee8;
+    --green: #4be87a;
+    --text: #eef0f5;
+    --muted: #6b7280;
+    --white: #ffffff;
+  }
+
+  body {
+    font-family: 'Syne', sans-serif;
+    background: #07080c;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  .device-shell {
+    width: 390px;
+    height: 844px;
+    background: var(--black);
+    border-radius: 52px;
+    border: 2px solid #2a2f3d;
+    box-shadow:
+      0 0 0 8px #0d0f14,
+      0 0 0 10px #1e2330,
+      0 60px 120px rgba(0,0,0,0.9),
+      inset 0 1px 0 rgba(255,255,255,0.05);
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Dynamic Island */
+  .notch {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 120px;
+    height: 34px;
+    background: #000;
+    border-radius: 20px;
+    z-index: 100;
+  }
+
+  /* Status bar */
+  .statusbar {
+    height: 54px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding: 0 28px 8px;
+    flex-shrink: 0;
+    z-index: 50;
+  }
+  .statusbar .time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .statusbar .icons {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    color: var(--text);
+    font-size: 12px;
+  }
+
+  /* Screen container */
+  .screen-container {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Individual screens */
+  .screen {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: none;
+    flex-direction: column;
+    scrollbar-width: none;
+  }
+  .screen::-webkit-scrollbar { display: none; }
+  .screen.active { display: flex; }
+
+  /* Bottom nav */
+  .bottom-nav {
+    height: 82px;
+    background: rgba(17,19,24,0.98);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding: 0 8px 16px;
+    flex-shrink: 0;
+    backdrop-filter: blur(20px);
+    z-index: 50;
+  }
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    padding: 8px 16px;
+    border-radius: 16px;
+    transition: all 0.2s;
+    color: var(--muted);
+  }
+  .nav-item.active { color: var(--gold); }
+  .nav-item:hover { background: rgba(232,184,75,0.08); }
+  .nav-icon { font-size: 22px; }
+  .nav-label { font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+
+  /* ===================== SCREEN 1: DASHBOARD ===================== */
+  #screen-dashboard {
+    background: var(--black);
+    gap: 0;
+  }
+
+  .dash-header {
+    padding: 16px 24px 24px;
+    background: linear-gradient(180deg, #0d0f14 0%, transparent 100%);
+  }
+  .dash-greeting {
+    font-size: 13px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+  }
+  .dash-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 36px;
+    color: var(--text);
+    letter-spacing: 0.02em;
+    line-height: 1;
+    margin-top: 2px;
+  }
+  .dash-name span { color: var(--gold); }
+
+  .belt-card {
+    margin: 0 20px 20px;
+    background: var(--card);
+    border-radius: 24px;
+    padding: 24px;
+    border: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+  .belt-card::before {
+    content: '';
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 180px; height: 180px;
+    background: radial-gradient(circle, rgba(232,184,75,0.15) 0%, transparent 70%);
+  }
+  .belt-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .belt-visual {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .belt-strip {
+    width: 48px;
+    height: 14px;
+    border-radius: 4px;
+    background: #1a5eff;
+    position: relative;
+    box-shadow: 0 2px 12px rgba(26,94,255,0.4);
+  }
+  .belt-strip::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 12px;
+    height: 100%;
+    background: #000;
+    border-radius: 0 4px 4px 0;
+  }
+  .belt-graus {
+    display: flex;
+    gap: 4px;
+  }
+  .grau {
+    width: 10px; height: 10px;
+    border-radius: 2px;
+    background: var(--gold);
+    box-shadow: 0 0 8px rgba(232,184,75,0.6);
+  }
+  .grau.empty {
+    background: var(--border);
+    box-shadow: none;
+  }
+  .belt-info { text-align: right; }
+  .belt-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    color: var(--text);
+    letter-spacing: 0.05em;
+  }
+  .belt-sub { font-size: 11px; color: var(--muted); font-weight: 600; }
+
+  .progress-label {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .progress-label span:last-child { color: var(--gold); }
+  .progress-bar {
+    height: 8px;
+    background: var(--border);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    width: 72%;
+    background: linear-gradient(90deg, #1a5eff, var(--gold));
+    border-radius: 99px;
+    position: relative;
+    animation: fillAnim 1.5s ease-out forwards;
+  }
+  @keyframes fillAnim { from { width: 0; } }
+
+  .stats-row {
+    display: flex;
+    gap: 12px;
+    margin: 0 20px 20px;
+  }
+  .stat-card {
+    flex: 1;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 18px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .stat-card:hover { border-color: var(--gold); transform: translateY(-2px); }
+  .stat-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 34px;
+    color: var(--gold);
+    line-height: 1;
+  }
+  .stat-lbl { font-size: 10px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 4px; }
+
+  .section-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 0.05em;
+    color: var(--text);
+    padding: 0 24px;
+    margin-bottom: 14px;
+  }
+
+  .alert-card {
+    margin: 0 20px 14px;
+    background: rgba(232,75,75,0.12);
+    border: 1px solid rgba(232,75,75,0.3);
+    border-radius: 18px;
+    padding: 16px 18px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .alert-icon { font-size: 28px; }
+  .alert-text .alert-title { font-size: 13px; font-weight: 700; color: var(--red); }
+  .alert-text .alert-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .next-class {
+    margin: 0 20px 20px;
+    background: linear-gradient(135deg, var(--card2), var(--card));
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .class-time {
+    background: var(--gold);
+    border-radius: 14px;
+    padding: 10px 14px;
+    text-align: center;
+    min-width: 60px;
+  }
+  .class-time .hour { font-family: 'Bebas Neue', sans-serif; font-size: 24px; color: #000; line-height: 1; }
+  .class-time .ampm { font-size: 10px; font-weight: 800; color: #000; }
+  .class-info .class-name { font-size: 15px; font-weight: 700; color: var(--text); }
+  .class-info .class-meta { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .class-qr {
+    margin-left: auto;
+    background: var(--border);
+    border-radius: 12px;
+    width: 44px; height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .class-qr:hover { background: var(--gold); }
+
+  /* ===================== SCREEN 2: CHAMADA ===================== */
+  #screen-chamada { background: var(--black); }
+
+  .chamada-header {
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .chamada-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    color: var(--text);
+    letter-spacing: 0.05em;
+  }
+  .chamada-count {
+    background: var(--gold);
+    color: #000;
+    font-size: 12px;
+    font-weight: 800;
+    padding: 4px 12px;
+    border-radius: 99px;
+  }
+  .turma-info {
+    margin: 0 20px 20px;
+    background: var(--card);
+    border-radius: 18px;
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid var(--border);
+  }
+  .turma-name { font-size: 15px; font-weight: 700; color: var(--text); }
+  .turma-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .turma-badge {
+    background: rgba(75,126,232,0.2);
+    color: var(--blue);
+    border: 1px solid rgba(75,126,232,0.3);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 12px;
+  }
+
+  .alunos-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    padding: 0 20px 20px;
+  }
+  .aluno-card {
+    background: var(--card);
+    border: 1.5px solid var(--border);
+    border-radius: 18px;
+    padding: 14px 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+    user-select: none;
+  }
+  .aluno-card:active { transform: scale(0.94); }
+  .aluno-card.presente {
+    border-color: var(--green);
+    background: rgba(75,232,122,0.08);
+  }
+  .aluno-card.falta {
+    border-color: var(--red);
+    background: rgba(232,75,75,0.08);
+    opacity: 0.6;
+  }
+  .aluno-avatar {
+    width: 50px; height: 50px;
+    border-radius: 50%;
+    background: var(--border);
+    margin: 0 auto 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    position: relative;
+  }
+  .aluno-belt-dot {
+    position: absolute;
+    bottom: 0; right: 0;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    border: 2px solid var(--card);
+  }
+  .aluno-name { font-size: 11px; font-weight: 700; color: var(--text); line-height: 1.2; }
+  .aluno-status {
+    margin-top: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+  .aluno-card.presente .aluno-status { color: var(--green); }
+  .aluno-card.falta .aluno-status { color: var(--red); }
+  .status-icon {
+    position: absolute;
+    top: 8px; right: 8px;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .aluno-card.presente .status-icon,
+  .aluno-card.falta .status-icon { opacity: 1; }
+
+  /* ===================== SCREEN 3: PROGRESSO ===================== */
+  #screen-progresso { background: var(--black); }
+
+  .prog-header {
+    padding: 16px 24px 20px;
+  }
+  .prog-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    color: var(--text);
+    letter-spacing: 0.05em;
+  }
+  .prog-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  .belt-timeline {
+    padding: 0 20px 24px;
+  }
+  .timeline-item {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 4px;
+    position: relative;
+  }
+  .timeline-left {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 40px;
+  }
+  .tl-dot {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 4px;
+  }
+  .tl-line {
+    width: 2px;
+    flex: 1;
+    min-height: 40px;
+    background: var(--border);
+    margin-top: 4px;
+  }
+  .timeline-content {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 16px 18px;
+    flex: 1;
+    margin-bottom: 12px;
+  }
+  .tl-belt {
+    font-size: 13px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .tl-date { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .tl-msg {
+    font-size: 12px;
+    color: var(--text);
+    opacity: 0.7;
+    margin-top: 8px;
+    font-style: italic;
+    line-height: 1.5;
+  }
+  .tl-photo {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    background: var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    float: right;
+    margin-left: 12px;
+  }
+
+  .competencias-section {
+    padding: 0 20px 20px;
+  }
+  .comp-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 20px;
+    margin-bottom: 12px;
+  }
+  .comp-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .comp-name { font-size: 14px; font-weight: 700; color: var(--text); }
+  .comp-score {
+    display: flex;
+    gap: 4px;
+  }
+  .star { font-size: 14px; color: var(--border); }
+  .star.filled { color: var(--gold); }
+  .comp-bar { height: 4px; background: var(--border); border-radius: 99px; overflow: hidden; }
+  .comp-fill { height: 100%; border-radius: 99px; }
+
+  .tecnicas-section { padding: 0 20px 20px; }
+  .tecnica-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .tecnica-check {
+    width: 24px; height: 24px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  .tecnica-check.done { background: rgba(75,232,122,0.2); color: var(--green); }
+  .tecnica-check.todo { background: var(--border); color: transparent; border: 2px solid var(--border); }
+  .tecnica-name { font-size: 13px; font-weight: 600; color: var(--text); }
+  .tecnica-name.done { opacity: 0.5; text-decoration: line-through; }
+
+  /* ===================== SCREEN 4: PERFIL ===================== */
+  #screen-perfil { background: var(--black); }
+
+  .perfil-hero {
+    background: linear-gradient(180deg, #0d1525 0%, var(--black) 100%);
+    padding: 24px 24px 32px;
+    text-align: center;
+    position: relative;
+  }
+  .perfil-avatar {
+    width: 90px; height: 90px;
+    border-radius: 50%;
+    background: var(--card);
+    border: 3px solid var(--gold);
+    margin: 0 auto 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 42px;
+    box-shadow: 0 0 30px rgba(232,184,75,0.3);
+  }
+  .perfil-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 30px;
+    color: var(--text);
+    letter-spacing: 0.05em;
+  }
+  .perfil-belt {
+    font-size: 13px;
+    color: var(--gold);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-top: 2px;
+  }
+  .perfil-academy { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  .perfil-stats {
+    display: flex;
+    margin: 0 20px 20px;
+    background: var(--card);
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .ps-item {
+    flex: 1;
+    padding: 18px 12px;
+    text-align: center;
+    border-right: 1px solid var(--border);
+  }
+  .ps-item:last-child { border-right: none; }
+  .ps-num { font-family: 'Bebas Neue', sans-serif; font-size: 28px; color: var(--gold); }
+  .ps-lbl { font-size: 10px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
+
+  .menu-list { padding: 0 20px 20px; }
+  .menu-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 18px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .menu-item:hover { border-color: var(--gold); }
+  .menu-icon {
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    background: rgba(232,184,75,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+  .menu-text { flex: 1; }
+  .menu-title { font-size: 14px; font-weight: 700; color: var(--text); }
+  .menu-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .menu-arrow { color: var(--muted); font-size: 16px; }
+
+  /* QR Modal */
+  .qr-modal {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.92);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    backdrop-filter: blur(20px);
+  }
+  .qr-modal.open { display: flex; }
+  .qr-box {
+    background: white;
+    border-radius: 24px;
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  @keyframes popIn { from { transform: scale(0.8); opacity: 0; } }
+  .qr-code {
+    width: 200px; height: 200px;
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 2px;
+  }
+  .qr-px { border-radius: 2px; background: #000; }
+  .qr-px.white { background: white; }
+  .qr-label {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    color: #000;
+    letter-spacing: 0.05em;
+    text-align: center;
+  }
+  .qr-sub { font-size: 12px; color: #666; text-align: center; font-family: 'Syne', sans-serif; }
+  .qr-timer {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--gold);
+  }
+  .qr-close {
+    margin-top: 24px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: white;
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 14px 40px;
+    border-radius: 99px;
+    cursor: pointer;
+  }
+
+  /* Animations */
+  .screen.active { animation: slideIn 0.3s ease; }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } }
+
+  .pulse-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  .btn-primary {
+    background: var(--gold);
+    color: #000;
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 800;
+    border: none;
+    border-radius: 99px;
+    padding: 14px 28px;
+    cursor: pointer;
+    width: 100%;
+    margin: 0 20px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    transition: all 0.2s;
+  }
+  .btn-primary:hover { background: var(--gold2); transform: translateY(-1px); }
+
+  .section-spacer { height: 20px; }
+</style>
+</head>
+<body>
+
+<div class="device-shell">
+  <div class="notch"></div>
+
+  <!-- Status Bar -->
+  <div class="statusbar">
+    <span class="time">09:41</span>
+    <div class="icons">
+      <span>●●●</span>
+      <span>WiFi</span>
+      <span>🔋</span>
+    </div>
+  </div>
+
+  <!-- Screens -->
+  <div class="screen-container">
+
+    <!-- SCREEN 1: DASHBOARD -->
+    <div class="screen active" id="screen-dashboard">
+      <div class="dash-header">
+        <div class="dash-greeting">Bom dia, campeão 👊</div>
+        <div class="dash-name">Marcos <span>Silva</span></div>
+      </div>
+
+      <!-- Belt Card -->
+      <div class="belt-card">
+        <div class="belt-row">
+          <div class="belt-visual">
+            <div class="belt-strip"></div>
+            <div class="belt-graus">
+              <div class="grau"></div>
+              <div class="grau"></div>
+              <div class="grau"></div>
+              <div class="grau empty"></div>
+            </div>
+          </div>
+          <div class="belt-info">
+            <div class="belt-title">Faixa Azul</div>
+            <div class="belt-sub">3º Grau · 4 anos</div>
+          </div>
+        </div>
+        <div class="progress-label">
+          <span>Progresso para Roxa</span>
+          <span>72%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill"></div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-num">187</div>
+          <div class="stat-lbl">Treinos</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num">12</div>
+          <div class="stat-lbl">Semanas</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num">94%</div>
+          <div class="stat-lbl">Freq.</div>
+        </div>
+      </div>
+
+      <!-- Alert -->
+      <div class="section-title">Alertas</div>
+      <div class="alert-card">
+        <div class="alert-icon">⚠️</div>
+        <div class="alert-text">
+          <div class="alert-title">Pedro Costa — 3 faltas seguidas</div>
+          <div class="alert-sub">Último treino: 12 dias atrás · Enviar mensagem?</div>
+        </div>
+      </div>
+
+      <!-- Next Class -->
+      <div class="section-title">Próxima Aula</div>
+      <div class="next-class">
+        <div class="class-time">
+          <div class="hour">18:30</div>
+          <div class="ampm">HOJE</div>
+        </div>
+        <div class="class-info">
+          <div class="class-name">Fundamentos BJJ</div>
+          <div class="class-meta">Prof. André · 14 alunos confirmados</div>
+        </div>
+        <div class="class-qr" onclick="openQR()">📱</div>
+      </div>
+
+      <div class="section-spacer"></div>
+    </div>
+
+    <!-- SCREEN 2: CHAMADA -->
+    <div class="screen" id="screen-chamada">
+      <div class="chamada-header">
+        <div class="chamada-title">Chamada Rápida</div>
+        <div class="chamada-count">9/14 Presentes</div>
+      </div>
+
+      <div class="turma-info">
+        <div>
+          <div class="turma-name">Fundamentos BJJ</div>
+          <div class="turma-meta">Hoje, 18:30 · <span class="pulse-dot"></span> Ao vivo</div>
+        </div>
+        <div class="turma-badge">ABERTA</div>
+      </div>
+
+      <div style="padding: 0 20px; font-size: 11px; color: var(--muted); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 14px;">
+        1 toque = Presente · 2 toques = Falta
+      </div>
+
+      <div class="alunos-grid" id="alunos-grid">
+        <!-- Filled by JS -->
+      </div>
+    </div>
+
+    <!-- SCREEN 3: PROGRESSO -->
+    <div class="screen" id="screen-progresso">
+      <div class="prog-header">
+        <div class="prog-title">Meu Progresso</div>
+        <div class="prog-sub">Jornada completa no tatame</div>
+      </div>
+
+      <!-- Timeline -->
+      <div class="section-title">Linha do Tempo</div>
+      <div class="belt-timeline">
+        <div class="timeline-item">
+          <div class="timeline-left">
+            <div class="tl-dot" style="background:#fff;"></div>
+            <div class="tl-line"></div>
+          </div>
+          <div class="timeline-content">
+            <div style="float:right" class="tl-photo">🥋</div>
+            <div class="tl-belt" style="color:#eee;">Faixa Branca</div>
+            <div class="tl-date">Março 2020</div>
+            <div class="tl-msg">"Bem-vindo ao caminho do Jiu-Jitsu. A jornada começa agora." — Prof. André</div>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-left">
+            <div class="tl-dot" style="background:#1a5eff;"></div>
+            <div class="tl-line"></div>
+          </div>
+          <div class="timeline-content">
+            <div style="float:right" class="tl-photo">📸</div>
+            <div class="tl-belt" style="color:#4b7ee8;">Faixa Azul · 1º Grau</div>
+            <div class="tl-date">Setembro 2021</div>
+            <div class="tl-msg">"Você mostrou dedicação e consistência. Parabéns pela azul!"</div>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-left">
+            <div class="tl-dot" style="background:#e8b84b;"></div>
+          </div>
+          <div class="timeline-content" style="border-color: var(--gold); background: rgba(232,184,75,0.06);">
+            <div class="tl-belt" style="color:var(--gold);">Faixa Roxa · Em progresso</div>
+            <div class="tl-date">Previsão: 2025 · 72% completo</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Competências -->
+      <div class="section-title">Competências</div>
+      <div class="competencias-section">
+        <div class="comp-card">
+          <div class="comp-row">
+            <div class="comp-name">⚡ Cardio / Gás</div>
+            <div class="comp-score">
+              <span class="star filled">★</span><span class="star filled">★</span>
+              <span class="star filled">★</span><span class="star filled">★</span>
+              <span class="star">★</span>
+            </div>
+          </div>
+          <div class="comp-bar"><div class="comp-fill" style="width:80%; background: var(--blue);"></div></div>
+        </div>
+        <div class="comp-card">
+          <div class="comp-row">
+            <div class="comp-name">🎯 Técnica</div>
+            <div class="comp-score">
+              <span class="star filled">★</span><span class="star filled">★</span>
+              <span class="star filled">★</span><span class="star">★</span>
+              <span class="star">★</span>
+            </div>
+          </div>
+          <div class="comp-bar"><div class="comp-fill" style="width:60%; background: var(--gold);"></div></div>
+        </div>
+        <div class="comp-card">
+          <div class="comp-row">
+            <div class="comp-name">🧠 Resiliência</div>
+            <div class="comp-score">
+              <span class="star filled">★</span><span class="star filled">★</span>
+              <span class="star filled">★</span><span class="star filled">★</span>
+              <span class="star filled">★</span>
+            </div>
+          </div>
+          <div class="comp-bar"><div class="comp-fill" style="width:100%; background: var(--green);"></div></div>
+        </div>
+      </div>
+
+      <!-- Técnicas Checklist -->
+      <div class="section-title">Currículo do Grau</div>
+      <div class="tecnicas-section">
+        <div class="tecnica-item">
+          <div class="tecnica-check done">✓</div>
+          <div class="tecnica-name done">Armlock da guarda fechada</div>
+        </div>
+        <div class="tecnica-item">
+          <div class="tecnica-check done">✓</div>
+          <div class="tecnica-name done">Passagem de toureando</div>
+        </div>
+        <div class="tecnica-item">
+          <div class="tecnica-check done">✓</div>
+          <div class="tecnica-name done">Triângulo pela guarda</div>
+        </div>
+        <div class="tecnica-item">
+          <div class="tecnica-check todo"></div>
+          <div class="tecnica-name">Raspagem de gancho duplo</div>
+        </div>
+        <div class="tecnica-item">
+          <div class="tecnica-check todo"></div>
+          <div class="tecnica-name">Kimura pela meia-guarda</div>
+        </div>
+        <div class="section-spacer"></div>
+      </div>
+    </div>
+
+    <!-- SCREEN 4: PERFIL -->
+    <div class="screen" id="screen-perfil">
+      <div class="perfil-hero">
+        <div class="perfil-avatar">🥋</div>
+        <div class="perfil-name">Marcos Silva</div>
+        <div class="perfil-belt">Faixa Azul · 3º Grau</div>
+        <div class="perfil-academy">Academia Mestre André · Aracaju, SE</div>
+      </div>
+
+      <div class="perfil-stats">
+        <div class="ps-item">
+          <div class="ps-num">187</div>
+          <div class="ps-lbl">Treinos</div>
+        </div>
+        <div class="ps-item">
+          <div class="ps-num">4</div>
+          <div class="ps-lbl">Anos</div>
+        </div>
+        <div class="ps-item">
+          <div class="ps-num">3</div>
+          <div class="ps-lbl">Medalhas</div>
+        </div>
+      </div>
+
+      <div class="menu-list">
+        <div class="menu-item">
+          <div class="menu-icon">💳</div>
+          <div class="menu-text">
+            <div class="menu-title">Mensalidade</div>
+            <div class="menu-sub">Próximo vencimento: 5 de Jan · R$ 150</div>
+          </div>
+          <div class="menu-arrow">›</div>
+        </div>
+        <div class="menu-item">
+          <div class="menu-icon">🎫</div>
+          <div class="menu-text">
+            <div class="menu-title">Eventos & Seminários</div>
+            <div class="menu-sub">Campeonato Interno · 25 Jan</div>
+          </div>
+          <div class="menu-arrow">›</div>
+        </div>
+        <div class="menu-item">
+          <div class="menu-icon">🔔</div>
+          <div class="menu-text">
+            <div class="menu-title">Notificações</div>
+            <div class="menu-sub">3 novas mensagens do professor</div>
+          </div>
+          <div class="menu-arrow">›</div>
+        </div>
+        <div class="menu-item">
+          <div class="menu-icon">⚙️</div>
+          <div class="menu-text">
+            <div class="menu-title">Configurações</div>
+            <div class="menu-sub">Conta, privacidade e academia</div>
+          </div>
+          <div class="menu-arrow">›</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end screen-container -->
+
+  <!-- Bottom Nav -->
+  <div class="bottom-nav">
+    <div class="nav-item active" onclick="goTo('dashboard', this)">
+      <div class="nav-icon">🏠</div>
+      <div class="nav-label">Início</div>
+    </div>
+    <div class="nav-item" onclick="goTo('chamada', this)">
+      <div class="nav-icon">✋</div>
+      <div class="nav-label">Chamada</div>
+    </div>
+    <div class="nav-item" onclick="goTo('progresso', this)">
+      <div class="nav-icon">📈</div>
+      <div class="nav-label">Progresso</div>
+    </div>
+    <div class="nav-item" onclick="goTo('perfil', this)">
+      <div class="nav-icon">👤</div>
+      <div class="nav-label">Perfil</div>
+    </div>
+  </div>
+
+  <!-- QR Modal -->
+  <div class="qr-modal" id="qr-modal">
+    <div class="qr-box">
+      <div class="qr-label">Presença — Fundamentos BJJ</div>
+      <canvas id="qr-canvas" width="200" height="200" style="border-radius:12px;"></canvas>
+      <div class="qr-sub">Escaneie para registrar presença</div>
+      <div class="qr-timer" id="qr-timer">:28</div>
+    </div>
+    <button class="qr-close" onclick="closeQR()">Fechar</button>
+  </div>
+
+</div><!-- end device-shell -->
+
+<script>
+// Navigation
+function goTo(screen, el) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('screen-' + screen).classList.add('active');
+  el.classList.add('active');
+}
+
+// Alunos data
+const alunos = [
+  { name: 'João P.', emoji: '🧑', belt: '#fff', status: 'presente' },
+  { name: 'Ana M.', emoji: '👩', belt: '#1a5eff', status: 'presente' },
+  { name: 'Carlos R.', emoji: '👨', belt: '#1a5eff', status: 'presente' },
+  { name: 'Fernanda', emoji: '👩', belt: '#fff', status: 'falta' },
+  { name: 'Ricardo L.', emoji: '🧔', belt: '#5c35cc', status: 'presente' },
+  { name: 'Juliana', emoji: '👩', belt: '#1a5eff', status: 'neutro' },
+  { name: 'Pablo S.', emoji: '🧑', belt: '#fff', status: 'neutro' },
+  { name: 'Beatriz', emoji: '👩', belt: '#1a5eff', status: 'presente' },
+  { name: 'Lucas M.', emoji: '👦', belt: '#fff', status: 'neutro' },
+  { name: 'Thiago C.', emoji: '🧔', belt: '#5c35cc', status: 'presente' },
+  { name: 'Marina A.', emoji: '👩', belt: '#1a5eff', status: 'neutro' },
+  { name: 'Eduardo', emoji: '👨', belt: '#fff', status: 'falta' },
+];
+
+const statusMap = {};
+alunos.forEach((a,i) => statusMap[i] = a.status);
+
+function renderAlunos() {
+  const grid = document.getElementById('alunos-grid');
+  grid.innerHTML = '';
+  alunos.forEach((a, i) => {
+    const st = statusMap[i];
+    const icons = { presente: '✅', falta: '❌', neutro: '' };
+    const stlbl = { presente: 'Presente', falta: 'Falta', neutro: 'Pendente' };
+    grid.innerHTML += `
+      <div class="aluno-card ${st !== 'neutro' ? st : ''}" onclick="toggleAluno(${i})">
+        <span class="status-icon">${icons[st]}</span>
+        <div class="aluno-avatar">
+          ${a.emoji}
+          <div class="aluno-belt-dot" style="background:${a.belt}"></div>
+        </div>
+        <div class="aluno-name">${a.name}</div>
+        <div class="aluno-status">${stlbl[st]}</div>
+      </div>`;
+  });
+}
+
+let tapTimers = {};
+function toggleAluno(i) {
+  if (!tapTimers[i]) {
+    // First tap = presente
+    statusMap[i] = 'presente';
+    tapTimers[i] = setTimeout(() => { delete tapTimers[i]; }, 400);
+  } else {
+    // Second tap quickly = falta
+    clearTimeout(tapTimers[i]);
+    delete tapTimers[i];
+    statusMap[i] = 'falta';
+  }
+  renderAlunos();
+}
+
+renderAlunos();
+
+// QR Code (draw a simple visual QR-like grid)
+function drawQR() {
+  const canvas = document.getElementById('qr-canvas');
+  const ctx = canvas.getContext('2d');
+  const size = 200;
+  const cells = 21;
+  const cell = size / cells;
+  ctx.fillStyle = 'white';
+  ctx.fillRect(0, 0, size, size);
+
+  // Use seeded random for stable QR pattern
+  let seed = Date.now() - (Date.now() % 30000);
+  function rand() { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; }
+
+  ctx.fillStyle = 'black';
+  for (let r = 0; r < cells; r++) {
+    for (let c = 0; c < cells; c++) {
+      // Corner finders
+      const isFinderTL = r < 7 && c < 7;
+      const isFinderTR = r < 7 && c >= cells - 7;
+      const isFinderBL = r >= cells - 7 && c < 7;
+      if (isFinderTL || isFinderTR || isFinderBL) {
+        const lr = isFinderTL ? r : isFinderBL ? r - (cells - 7) : r;
+        const lc = isFinderTL || isFinderBL ? c : c - (cells - 7);
+        const outer = (lr === 0 || lr === 6 || lc === 0 || lc === 6);
+        const inner = (lr >= 2 && lr <= 4 && lc >= 2 && lc <= 4);
+        if (outer || inner) ctx.fillRect(c * cell, r * cell, cell, cell);
+      } else {
+        if (rand() > 0.5) ctx.fillRect(c * cell + 1, r * cell + 1, cell - 2, cell - 2);
+      }
+    }
+  }
+}
+
+// QR Timer
+let qrInterval;
+let qrSecs = 28;
+function openQR() {
+  document.getElementById('qr-modal').classList.add('open');
+  drawQR();
+  qrSecs = 28;
+  document.getElementById('qr-timer').textContent = ':' + String(qrSecs).padStart(2,'0');
+  qrInterval = setInterval(() => {
+    qrSecs--;
+    if (qrSecs <= 0) { qrSecs = 30; drawQR(); }
+    document.getElementById('qr-timer').textContent = ':' + String(qrSecs).padStart(2,'0');
+  }, 1000);
+}
+function closeQR() {
+  document.getElementById('qr-modal').classList.remove('open');
+  clearInterval(qrInterval);
+}
+</script>
+</body>
+</html>

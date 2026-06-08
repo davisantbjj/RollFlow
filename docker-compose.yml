@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: rollflow_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: rollflow
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  # O backend pode ser executado localmente via "npm run dev", 
+  # ou via Docker.
+  backend:
+    build: ./backend
+    container_name: rollflow_backend
+    ports:
+      - "3333:3333"
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: "postgresql://postgres:postgres@db:5432/rollflow?schema=public"
+      JWT_SECRET: "supersecret_rollflow_key_change_in_prod"
+      PORT: 3333
+
+volumes:
+  pgdata:

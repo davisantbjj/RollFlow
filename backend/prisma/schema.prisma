@@ -1,0 +1,167 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  MASTER
+  ADMIN
+  PROFESSOR
+  ALUNO
+  RESPONSAVEL
+}
+
+model Academy {
+  id        String   @id @default(uuid())
+  name      String
+  cnpj      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users   User[]
+  classes Class[]
+  plans   Plan[]
+  posts   Post[]
+}
+
+model User {
+  id       String @id @default(uuid())
+  name     String
+  email    String @unique
+  password String
+  role     Role
+
+  // Multi-tenant: Master pode ter null academyId, os demais precisam estar atrelados
+  academyId String?
+  academy   Academy? @relation(fields: [academyId], references: [id])
+
+  // Responsável e Alunos
+  dependents User[]  @relation("ResponsavelAlunos")
+  guardianId String?
+  guardian   User?   @relation("ResponsavelAlunos", fields: [guardianId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  classes       ClassTeacher[]
+  enrollments   Enrollment[]
+  attendances   Attendance[]
+  subscriptions Subscription[]
+  posts         Post[]
+  comments      Comment[]
+}
+
+model Class {
+  id          String  @id @default(uuid())
+  name        String
+  description String?
+
+  academyId String
+  academy   Academy @relation(fields: [academyId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  teachers    ClassTeacher[]
+  students    Enrollment[]
+  attendances Attendance[]
+}
+
+model ClassTeacher {
+  classId   String
+  class     Class  @relation(fields: [classId], references: [id])
+  teacherId String
+  teacher   User   @relation(fields: [teacherId], references: [id])
+
+  @@id([classId, teacherId])
+}
+
+model Enrollment {
+  classId   String
+  class     Class  @relation(fields: [classId], references: [id])
+  studentId String
+  student   User   @relation(fields: [studentId], references: [id])
+
+  @@id([classId, studentId])
+}
+
+model Attendance {
+  id        String @id @default(uuid())
+  classId   String
+  class     Class  @relation(fields: [classId], references: [id])
+  studentId String
+  student   User   @relation(fields: [studentId], references: [id])
+}
+
+model Plan {
+  id          String  @id @default(uuid())
+  name        String
+  description String?
+  price       Float
+  interval    String // e.g., 'MONTHLY', 'QUARTERLY', 'YEARLY'
+  academyId   String
+  academy     Academy @relation(fields: [academyId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id      String   @id @default(uuid())
+  userId  String
+  user    User     @relation(fields: [userId], references: [id])
+  planId  String
+  plan    Plan     @relation(fields: [planId], references: [id])
+  status  String // 'ACTIVE', 'OVERDUE', 'CANCELED'
+  dueDate DateTime // Next payment date
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  payments Payment[]
+}
+
+model Payment {
+  id             String       @id @default(uuid())
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id])
+  amount         Float
+  status         String // 'PAID', 'PENDING', 'FAILED'
+  paymentDate    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Post {
+  id        String  @id @default(uuid())
+  content   String
+  authorId  String
+  author    User    @relation(fields: [authorId], references: [id])
+  academyId String
+  academy   Academy @relation(fields: [academyId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  comments Comment[]
+}
+
+model Comment {
+  id       String @id @default(uuid())
+  content  String
+  postId   String
+  post     Post   @relation(fields: [postId], references: [id])
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id])
+
+  createdAt DateTime @default(now())
+}
