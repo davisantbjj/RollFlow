@@ -1,4 +1,6 @@
-version: '3.8'
+# Ambiente de desenvolvimento completo: banco + API + app.
+# Rodar com:  docker compose up --watch
+# (o --watch copia para os containers cada arquivo que você salva)
 
 services:
   db:
@@ -12,20 +14,72 @@ services:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d rollflow"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
 
-  # O backend pode ser executado localmente via "npm run dev", 
-  # ou via Docker.
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
     container_name: rollflow_backend
     ports:
       - "3333:3333"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
       DATABASE_URL: "postgresql://postgres:postgres@db:5432/rollflow?schema=public"
-      JWT_SECRET: "supersecret_rollflow_key_change_in_prod"
+      JWT_SECRET: ${JWT_SECRET:-dev_only_secret_change_me}
       PORT: 3333
+      NODE_ENV: development
+      CORS_ORIGINS: "http://localhost:8081,http://${HOST_IP:-localhost}:8081"
+    develop:
+      watch:
+        - action: sync
+          path: ./backend/src
+          target: /app/src
+        - action: sync+restart
+          path: ./backend/prisma
+          target: /app/prisma
+        - action: rebuild
+          path: ./backend/package.json
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: rollflow_frontend
+    ports:
+      - "8081:8081"
+    depends_on:
+      - backend
+    tty: true
+    stdin_open: true
+    environment:
+      # IP do PC na rede, para o celular (Expo Go) achar o Metro e a API
+      REACT_NATIVE_PACKAGER_HOSTNAME: ${HOST_IP:-localhost}
+      EXPO_PUBLIC_API_URL: "http://${HOST_IP:-localhost}:3333"
+    develop:
+      watch:
+        - action: sync
+          path: ./frontend/src
+          target: /app/src
+        - action: sync
+          path: ./frontend/store
+          target: /app/store
+        - action: sync
+          path: ./frontend/theme
+          target: /app/theme
+        - action: sync
+          path: ./frontend/assets
+          target: /app/assets
+        - action: rebuild
+          path: ./frontend/package.json
+        - action: rebuild
+          path: ./frontend/app.json
 
 volumes:
   pgdata:
