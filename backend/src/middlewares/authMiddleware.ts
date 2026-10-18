@@ -82,3 +82,35 @@ export const authorizeRole = (roles: Role[]) => {
     next();
   };
 };
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** MASTER "entra" numa academia via header X-Academy-Id. Para os demais papéis o header é ignorado. */
+export const academyContext = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const header = req.headers['x-academy-id'];
+    const academyId = Array.isArray(header) ? header[0] : header;
+    if (req.user?.role === 'MASTER' && academyId) {
+      const academy = UUID_RE.test(academyId)
+        ? await prisma.academy.findUnique({ where: { id: academyId }, select: { id: true } })
+        : null;
+      if (!academy) {
+        res.status(404).json({ error: 'Academia não encontrada' });
+        return;
+      }
+      req.user.academyId = academy.id;
+    }
+    next();
+  } catch (err) {
+    next(err);
+  }
+};
+
+/** Rotas de academia: MASTER sem contexto não tem em qual academia operar. */
+export const requireAcademy = (req: AuthRequest, res: Response, next: NextFunction): void => {
+  if (req.user?.role === 'MASTER' && !req.user.academyId) {
+    res.status(400).json({ error: 'Selecione uma academia' });
+    return;
+  }
+  next();
+};

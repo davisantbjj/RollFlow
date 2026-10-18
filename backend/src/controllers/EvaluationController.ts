@@ -17,7 +17,7 @@ export class EvaluationController {
       }
 
       // Check permissions: only MASTER, ADMIN or PROFESSOR from the same academy can evaluate
-      if (req.user!.role !== 'MASTER' && req.user!.academyId !== student.academyId) {
+      if (req.user!.academyId !== student.academyId) {
         res.status(403).json({ error: 'Proibido: Aluno pertence a outra academia' });
         return;
       }

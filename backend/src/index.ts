@@ -18,6 +18,7 @@ import progressionRoutes from './routes/progression';
 import evaluationRoutes from './routes/evaluation';
 import postRoutes from './routes/post';
 import dashboardRoutes from './routes/dashboard';
+import masterRoutes from './routes/master';
 import { startOverdueJob } from './jobs/overdueJob';
 import { errorHandler } from './middlewares/errorHandler';
 
@@ -53,6 +54,7 @@ app.use(
       }
     },
     credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Academy-Id'],
   })
 );
 
@@ -90,6 +92,7 @@ app.use('/progression', progressionRoutes);
 app.use('/evaluation', evaluationRoutes);
 app.use('/posts', postRoutes);
 app.use('/dashboard', dashboardRoutes);
+app.use('/master', masterRoutes);
 
 // Health check
 app.get('/health', (_req, res) => {

@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import { AttendanceController } from '../controllers/AttendanceController';
-import { authenticate, authorizeRole } from '../middlewares/authMiddleware';
+import { authenticate, authorizeRole, academyContext, requireAcademy } from '../middlewares/authMiddleware';
 import { validateBody, validateParams } from '../middlewares/validateBody';
 import { checkInSchema, classIdParamSchema } from '../schemas/index';
 
 const router = Router();
 
-router.use(authenticate);
+router.use(authenticate, academyContext, requireAcademy);
 
 // Professores/Admins podem fazer check-in de qualquer aluno informando o studentId
 // Alunos podem fazer check-in deles mesmos omitindo o studentId

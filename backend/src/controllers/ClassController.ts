@@ -12,14 +12,9 @@ export class ClassController {
   static async create(req: AuthRequest, res: Response): Promise<void> {
     const { name, description, dayOfWeek, startTime, endTime, maxStudents } = req.body;
 
-    const academyId: string = req.body.academyId ?? (req.user!.academyId as string);
+    const academyId = req.user!.academyId as string;
 
     try {
-      if (req.user!.role !== 'MASTER' && req.user!.academyId !== academyId) {
-        res.status(403).json({ error: 'Proibido: Não é possível criar turma para outra academia' });
-        return;
-      }
-
       const newClass = await prisma.class.create({
         data: { name, description, academyId, dayOfWeek, startTime, endTime, maxStudents },
       });
@@ -32,32 +27,22 @@ export class ClassController {
 
   static async list(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const { role, academyId } = req.user!;
+      const { id, role, academyId } = req.user!;
+      const mine = req.query.mine === 'true';
 
-      if (role === 'MASTER') {
-        const classes = await prisma.class.findMany({
-          include: {
-            academy: true,
-            _count: { select: { students: true, teachers: true } },
-            teachers: { select: { teacher: { select: { id: true, name: true } } } },
-          },
-          orderBy: { createdAt: 'desc' },
-        });
-        res.json(classes.map(flattenTeachers));
-      } else {
-        const classes = await prisma.class.findMany({
-          where: {
-            academyId: academyId as string,
-            ...(role === 'ALUNO' ? { students: { some: { studentId: req.user!.id } } } : {}),
-          },
-          include: {
-            _count: { select: { students: true, teachers: true } },
-            teachers: { select: { teacher: { select: { id: true, name: true } } } },
-          },
-          orderBy: { name: 'asc' },
-        });
-        res.json(classes.map(flattenTeachers));
-      }
+      const classes = await prisma.class.findMany({
+        where: {
+          academyId: academyId as string,
+          ...(role === 'ALUNO' ? { students: { some: { studentId: id } } } : {}),
+          ...(mine ? { teachers: { some: { teacherId: id } } } : {}),
+        },
+        include: {
+          _count: { select: { students: true, teachers: true } },
+          teachers: { select: { teacher: { select: { id: true, name: true } } } },
+        },
+        orderBy: { name: 'asc' },
+      });
+      res.json(classes.map(flattenTeachers));
     } catch (error) {
       console.error('[ClassController.list]', error);
       res.status(500).json({ error: 'Erro interno do servidor' });

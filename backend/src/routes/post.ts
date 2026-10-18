@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import { PostController } from '../controllers/PostController';
-import { authenticate, authorizeRole } from '../middlewares/authMiddleware';
+import { authenticate, authorizeRole, academyContext, requireAcademy } from '../middlewares/authMiddleware';
 import { validateBody, validateParams } from '../middlewares/validateBody';
 import { createPostBodySchema, pinPostSchema, commentSchema, uuidParamSchema } from '../schemas/index';
 
 const router = Router();
 
-router.use(authenticate);
+router.use(authenticate, academyContext, requireAcademy);
 
 router.get('/', PostController.list);
 router.post('/', authorizeRole(['MASTER', 'ADMIN', 'PROFESSOR']), validateBody(createPostBodySchema), PostController.create);

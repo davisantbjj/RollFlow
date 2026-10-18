@@ -40,6 +40,88 @@ async function clearAll() {
   await prisma.academy.deleteMany();
 }
 
+/** Segunda academia, para o MASTER comparar clientes e para testar isolamento entre academias. */
+async function seedGracie(passwordHash: string) {
+  const academy = await prisma.academy.create({
+    data: { name: 'Gracie Tatuapé', address: 'Rua Tuiuti, 500 - Tatuapé, São Paulo', phone: '(11) 97777-0000', blockAfterDays: 7, createdAt: daysAgo(200) },
+  });
+  const mk = (name: string, email: string, role: Role, monthsAgo: number, beltColor: BeltColor = 'BRANCA', isBlocked = false) =>
+    prisma.user.create({
+      data: { name, email, password: passwordHash, role, academyId: academy.id, beltColor, isBlocked, createdAt: daysAgo(monthsAgo * 30) },
+    });
+
+  const dono = await mk('Mestre Carlos Gracie Jr.', 'dono2@rollflow.com', 'ADMIN', 7, 'PRETA');
+  const prof = await mk('Professor Marcos', 'professor2@rollflow.com', 'PROFESSOR', 6, 'MARROM');
+  const alunos = [
+    await mk('Ana Beatriz', 'ana@gracie.com', 'ALUNO', 5),
+    await mk('Bernardo Reis', 'bernardo@gracie.com', 'ALUNO', 5, 'AZUL'),
+    await mk('Clara Mendes', 'clara@gracie.com', 'ALUNO', 4),
+    await mk('Davi Nogueira', 'davi@gracie.com', 'ALUNO', 3, 'AZUL'),
+    await mk('Elisa Prado', 'elisa@gracie.com', 'ALUNO', 2),
+    await mk('Fábio Teixeira', 'fabio@gracie.com', 'ALUNO', 1, 'BRANCA', true),
+  ];
+
+  const mkClass = (name: string, dayOfWeek: string, startTime: string, endTime: string) =>
+    prisma.class.create({ data: { name, dayOfWeek, startTime, endTime, maxStudents: 30, academyId: academy.id } });
+  const manha = await mkClass('Manhã - Todos os níveis', 'TERCA', '07:00', '08:30');
+  const noite = await mkClass('Noite - Competição', 'QUINTA', '20:00', '21:30');
+  await prisma.classTeacher.createMany({
+    data: [
+      { classId: manha.id, teacherId: prof.id },
+      { classId: noite.id, teacherId: prof.id },
+    ],
+  });
+  const classOf = (i: number) => (i % 2 === 0 ? manha.id : noite.id);
+  await prisma.enrollment.createMany({ data: alunos.map((a, i) => ({ classId: classOf(i), studentId: a.id })) });
+
+  const mensal = await prisma.plan.create({ data: { name: 'Mensal', price: 220, interval: 'MONTHLY', academyId: academy.id } });
+  await prisma.plan.create({ data: { name: 'Trimestral', price: 600, interval: 'QUARTERLY', academyId: academy.id } });
+
+  // Pagamentos mês a mês desde a entrada de cada aluno (receita crescente)
+  const paidFrom = [5, 5, 4, 3, 2, 1];
+  for (let i = 0; i < alunos.length; i++) {
+    const overdue = i === 5;
+    const nextDue = overdue ? daysAgo(10) : daysAhead(12);
+    const sub = await prisma.subscription.create({
+      data: { userId: alunos[i].id, planId: mensal.id, status: overdue ? 'OVERDUE' : 'ACTIVE', dueDate: nextDue, paymentMethod: 'PIX' },
+    });
+    for (let m = paidFrom[i] - (overdue ? 0 : 0); m >= 1; m--) {
+      if (overdue && m === 1) continue;
+      const d = daysAgo(m * 30 - 2);
+      await prisma.payment.create({ data: { subscriptionId: sub.id, amount: mensal.price, status: 'PAID', dueDate: d, paymentDate: d } });
+    }
+    // Pago neste mês para parte da turma
+    if (!overdue && i % 2 === 0) {
+      const d = daysAgo(2 + i);
+      await prisma.payment.create({ data: { subscriptionId: sub.id, amount: mensal.price, status: 'PAID', dueDate: d, paymentDate: d } });
+    }
+    await prisma.payment.create({ data: { subscriptionId: sub.id, amount: mensal.price, status: 'PENDING', dueDate: nextDue } });
+  }
+
+  // Presenças dos últimos 6 meses (mais alunos entrando = mais presenças)
+  const used = new Set<string>();
+  const joinedDaysAgo = [150, 150, 120, 90, 60, 30];
+  for (const [fromDay, toDay, total] of [[0, 30, 34], [30, 60, 26], [60, 90, 20], [90, 120, 14], [120, 150, 9], [150, 178, 5]] as const) {
+    let n = 0;
+    let guard = 0;
+    while (n < total && guard++ < 2000) {
+      const idx = Math.floor(rand() * alunos.length);
+      const day = fromDay + Math.floor(rand() * (toDay - fromDay));
+      const key = `${idx}|${day}`;
+      if (used.has(key) || day > joinedDaysAgo[idx] || alunos[idx].isBlocked) continue;
+      used.add(key);
+      const date = daysAgo(day);
+      date.setHours(7, 15, 0, 0);
+      await prisma.attendance.create({ data: { classId: classOf(idx), studentId: alunos[idx].id, date, createdAt: date } });
+      n++;
+    }
+  }
+
+  await prisma.post.create({
+    data: { authorId: dono.id, academyId: academy.id, content: 'Bem-vindos à Gracie Tatuapé! Treinos de terça e quinta.', isPinned: true, createdAt: daysAgo(20) },
+  });
+}
+
 async function main() {
   console.log('Iniciando seed do banco de dados...');
   await clearAll();
@@ -49,7 +131,8 @@ async function main() {
   });
 
   const password = await bcrypt.hash('123456', 10);
-  const mkUser = (
+  const createUser = (
+    academyId: string | null,
     name: string,
     email: string,
     role: Role,
@@ -61,7 +144,7 @@ async function main() {
         email,
         password,
         role,
-        academyId: academy.id,
+        academyId,
         beltColor: extra.beltColor ?? 'BRANCA',
         beltDegree: extra.beltDegree ?? 0,
         isBlocked: extra.isBlocked ?? false,
@@ -70,18 +153,23 @@ async function main() {
         createdAt: daysAgo((extra.monthsAgo ?? 12) * 30),
       },
     });
+  const mkUser = (name: string, email: string, role: Role, extra: Parameters<typeof createUser>[4] = {}) =>
+    createUser(academy.id, name, email, role, extra);
 
   // ===== Usuários =====
-  const mestre = await mkUser('Mestre Silva', 'mestre@rollflow.com', 'MASTER', { beltColor: 'PRETA', beltDegree: 3, monthsAgo: 36 });
+  // MASTER: dono do SaaS, sem academia
+  await createUser(null, 'Admin RollFlow', 'master@rollflow.com', 'MASTER', { beltColor: 'PRETA', monthsAgo: 36 });
+  // Dono da academia (ADMIN); também dá aula (vinculado a uma turma abaixo)
+  const mestre = await mkUser('Mestre Silva', 'dono@rollflow.com', 'ADMIN', { beltColor: 'PRETA', beltDegree: 3, monthsAgo: 36 });
   const professor = await mkUser('Professor Rafael', 'professor@rollflow.com', 'PROFESSOR', { beltColor: 'PRETA', beltDegree: 1, monthsAgo: 24 });
   const aluno = await mkUser('João Aluno', 'aluno@rollflow.com', 'ALUNO', { beltColor: 'AZUL', beltDegree: 1, monthsAgo: 20, phone: '(11) 98888-0001' });
 
   const bruno = await mkUser('Bruno Costa', 'bruno@rollflow.com', 'ALUNO', { monthsAgo: 4 });
-  const camila = await mkUser('Camila Torres', 'camila@rollflow.com', 'ALUNO', { beltDegree: 2, monthsAgo: 8 });
+  const camila = await mkUser('Camila Torres', 'camila@rollflow.com', 'ALUNO', { beltDegree: 2, monthsAgo: 2 });
   const diego = await mkUser('Diego Ramos', 'diego@rollflow.com', 'ALUNO', { beltColor: 'ROXA', beltDegree: 0, monthsAgo: 30 });
   const eduardo = await mkUser('Eduardo Lima', 'eduardo@rollflow.com', 'ALUNO', { beltColor: 'AZUL', beltDegree: 3, monthsAgo: 26 });
-  const fernanda = await mkUser('Fernanda Souza', 'fernanda@rollflow.com', 'ALUNO', { beltDegree: 1, monthsAgo: 6 });
-  const gabriel = await mkUser('Gabriel Alves', 'gabriel@rollflow.com', 'ALUNO', { beltColor: 'AZUL', beltDegree: 0, monthsAgo: 14 });
+  const fernanda = await mkUser('Fernanda Souza', 'fernanda@rollflow.com', 'ALUNO', { beltDegree: 1, monthsAgo: 5 });
+  const gabriel = await mkUser('Gabriel Alves', 'gabriel@rollflow.com', 'ALUNO', { beltColor: 'AZUL', beltDegree: 0, monthsAgo: 1 });
   const lucas = await mkUser('Lucas Atrasado', 'lucas@rollflow.com', 'ALUNO', { monthsAgo: 10, isBlocked: true });
 
   const responsavel = await mkUser('Marina Responsável', 'responsavel@rollflow.com', 'RESPONSAVEL', { monthsAgo: 6 });
@@ -89,7 +177,7 @@ async function main() {
     beltColor: 'CINZA',
     beltDegree: 1,
     guardianId: responsavel.id,
-    monthsAgo: 6,
+    monthsAgo: 3,
   });
 
   // ===== Turmas =====
@@ -152,11 +240,11 @@ async function main() {
   }
 
   // Em dia, 1 pago no mês atual (receita do mês)
-  await subscribe(aluno.id, mensal, { paidMonthsAgo: [3, 2], pendingDueIn: 20 });
-  await subscribe(camila.id, trimestral, { paidMonthsAgo: [2], pendingDueIn: 25 });
-  await subscribe(eduardo.id, mensal, { paidMonthsAgo: [3, 2], pendingDueIn: 8 });
-  await subscribe(diego.id, mensal, { paidMonthsAgo: [2], pendingDueIn: 2 });
-  await subscribe(miguel.id, infantil, { paidMonthsAgo: [2], pendingDueIn: 5 });
+  await subscribe(aluno.id, mensal, { paidMonthsAgo: [5, 4, 3, 2, 1], pendingDueIn: 20 });
+  await subscribe(camila.id, trimestral, { paidMonthsAgo: [2, 1], pendingDueIn: 25 });
+  await subscribe(eduardo.id, mensal, { paidMonthsAgo: [5, 4, 3, 2, 1], pendingDueIn: 8 });
+  await subscribe(diego.id, mensal, { paidMonthsAgo: [4, 3, 2, 1], pendingDueIn: 2 });
+  await subscribe(miguel.id, infantil, { paidMonthsAgo: [3, 2, 1], pendingDueIn: 5 });
   // Pago neste mês (data de pagamento = hoje - 3 dias)
   const sg = await prisma.subscription.create({
     data: { userId: gabriel.id, planId: mensal.id, status: 'ACTIVE', dueDate: daysAhead(27) },
@@ -177,9 +265,9 @@ async function main() {
     ],
   });
   // Atrasado há 3 dias (ainda dentro da tolerância, não bloqueado)
-  await subscribe(bruno.id, mensal, { paidMonthsAgo: [1], pendingDueIn: -3 });
+  await subscribe(bruno.id, mensal, { paidMonthsAgo: [4, 3, 2, 1], pendingDueIn: -3 });
   // Atrasado há 12 dias: assinatura OVERDUE e usuário bloqueado
-  await subscribe(lucas.id, mensal, { paidMonthsAgo: [2], pendingDueIn: -12, status: 'OVERDUE' });
+  await subscribe(lucas.id, mensal, { paidMonthsAgo: [5, 4, 3, 2], pendingDueIn: -12, status: 'OVERDUE' });
 
   // ===== Presenças (~40 nos últimos 2 meses) =====
   const used = new Set<string>();
@@ -197,6 +285,21 @@ async function main() {
     date.setHours(19, 15, 0, 0);
     await prisma.attendance.create({ data: { classId, studentId, date, createdAt: date } });
     attendanceCount++;
+  }
+  // Histórico mais antigo (60 a 180 dias) com tendência de crescimento para as séries mensais
+  for (const [fromDay, toDay, total] of [[60, 90, 18], [90, 120, 14], [120, 150, 10], [150, 178, 7]] as const) {
+    let n = 0;
+    while (n < total) {
+      const [classId, studentId] = classByStudent[Math.floor(rand() * classByStudent.length)];
+      const day = fromDay + Math.floor(rand() * (toDay - fromDay));
+      const key = `${classId}|${studentId}|${day}`;
+      if (used.has(key)) continue;
+      used.add(key);
+      const date = daysAgo(day);
+      date.setHours(19, 15, 0, 0);
+      await prisma.attendance.create({ data: { classId, studentId, date, createdAt: date } });
+      n++;
+    }
   }
   // João (aluno@) com frequência garantida: 1 presença por semana nas últimas 6 semanas
   for (let w = 0; w < 6; w++) {
@@ -223,10 +326,16 @@ async function main() {
     });
   }
 
+  // Diego foi avaliado há 80 dias (aparece em "sem avaliação recente") e já cumpre a regra da faixa roxa
+  await prisma.evaluation.create({
+    data: { studentId: diego.id, evaluatorId: professor.id, technique: 4, discipline: 4, evolution: 4, notes: 'Evolução consistente.', createdAt: daysAgo(80) },
+  });
+
   // ===== Regras de progressão =====
   await prisma.progressionRule.createMany({
     data: [
       { academyId: academy.id, beltColor: 'BRANCA', minAttendanceCount: 60, minMonths: 6, minEvaluationScore: 3.0, requiresEvaluation: true },
+      { academyId: academy.id, beltColor: 'ROXA', minAttendanceCount: 5, minMonths: 12, minEvaluationScore: 3.0, requiresEvaluation: true },
       { academyId: academy.id, beltColor: 'AZUL', minAttendanceCount: 120, minMonths: 18, minEvaluationScore: 3.5, requiresEvaluation: true },
     ],
   });
@@ -266,8 +375,10 @@ async function main() {
     ],
   });
 
-  console.log('Seed concluído: RollFlow BJJ');
-  console.log('Logins (senha 123456): mestre@, professor@, aluno@, responsavel@ rollflow.com');
+  await seedGracie(password);
+
+  console.log('Seed concluído: RollFlow BJJ + Gracie Tatuapé');
+  console.log('Logins (senha 123456): master@, dono@, dono2@, professor@, aluno@, responsavel@ rollflow.com');
 }
 
 main()

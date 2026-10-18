@@ -3,6 +3,7 @@ import { prisma } from '../index';
 import { AuthRequest } from '../middlewares/authMiddleware';
 import { canViewStudent } from '../utils/access';
 import { BeltColor } from '@prisma/client';
+import { computeProgression } from '../utils/progression';
 
 export class ProgressionController {
   
@@ -44,74 +45,22 @@ export class ProgressionController {
         },
       });
 
-      // Se não houver regra específica da academia, usa padrão BJJ adulto (apenas para exemplo, ideal é configurar)
-      const defaultRule = {
-        minAttendanceCount: 100,
-        minMonths: 12,
-        minEvaluationScore: 3.0,
-        requiresEvaluation: true,
-      };
+      // 3. Presenças e avaliações desde a data de referência
+      const [attendances, evaluations] = await Promise.all([
+        prisma.attendance.count({ where: { studentId, createdAt: { gte: referenceDate }, present: true } }),
+        prisma.evaluation.findMany({ where: { studentId, createdAt: { gte: referenceDate } } }),
+      ]);
 
-      const activeRule = rule || defaultRule;
-
-      // 3. Count attendances since reference date
-      const attendances = await prisma.attendance.count({
-        where: {
-          studentId,
-          createdAt: { gte: referenceDate },
-          present: true,
-        },
-      });
-
-      // 4. Calculate months elapsed
-      const now = new Date();
-      const diffTime = Math.abs(now.getTime() - referenceDate.getTime());
-      const elapsedDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      const elapsedMonths = elapsedDays / 30.44; // average days in month
-
-      // 5. Get average evaluation score
-      const evaluations = await prisma.evaluation.findMany({
-        where: {
-          studentId,
-          createdAt: { gte: referenceDate },
-        },
-      });
-
-      let avgScore = 0;
-      if (evaluations.length > 0) {
-        const totalScore = evaluations.reduce((acc, curr) => acc + curr.technique + curr.discipline + curr.evolution, 0);
-        avgScore = totalScore / (evaluations.length * 3); // 3 criteria per evaluation
-      }
-
-      // 6. Calculate percentages
-      const ratio = (value: number, min: number) => (min > 0 ? Math.min(100, (value / min) * 100) : 100);
-      const attendProgress = ratio(attendances, activeRule.minAttendanceCount);
-      const timeProgress = ratio(elapsedMonths, activeRule.minMonths);
-      
-      let evalProgress = 100;
-      if (activeRule.requiresEvaluation) {
-        evalProgress = ratio(avgScore, activeRule.minEvaluationScore);
-      }
-
-      const totalProgress = Math.round((attendProgress + timeProgress + evalProgress) / 3);
+      const result = computeProgression({ referenceDate, rule, attendances, evaluations });
 
       res.json({
         currentBelt: student.beltColor,
         currentDegree: student.beltDegree,
         referenceDate,
-        rule: activeRule,
-        stats: {
-          attendances,
-          elapsedMonths: Number(elapsedMonths.toFixed(1)),
-          avgScore: Number(avgScore.toFixed(1)),
-        },
-        progress: {
-          attendance: Math.round(attendProgress),
-          time: Math.round(timeProgress),
-          evaluation: Math.round(evalProgress),
-          total: totalProgress,
-        },
-        isReady: totalProgress >= 100,
+        rule: result.rule,
+        stats: result.stats,
+        progress: result.progress,
+        isReady: result.isReady,
       });
 
     } catch (error) {
@@ -137,7 +86,7 @@ export class ProgressionController {
         return;
       }
 
-      if (req.user!.role !== 'MASTER' && req.user!.academyId !== student.academyId) {
+      if (req.user!.academyId !== student.academyId) {
         res.status(403).json({ error: 'Aluno pertence a outra academia' });
         return;
       }
@@ -171,7 +120,7 @@ export class ProgressionController {
     const { academyId, beltColor, minAttendanceCount, minMonths, minEvaluationScore, requiresEvaluation } = req.body;
 
     try {
-      if (req.user!.role !== 'MASTER' && req.user!.academyId !== academyId) {
+      if (req.user!.academyId !== academyId) {
         res.status(403).json({ error: 'Proibido' });
         return;
       }

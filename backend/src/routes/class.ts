@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import { ClassController } from '../controllers/ClassController';
-import { authenticate, authorizeRole } from '../middlewares/authMiddleware';
+import { authenticate, authorizeRole, academyContext, requireAcademy } from '../middlewares/authMiddleware';
 import { validateBody, validateParams } from '../middlewares/validateBody';
 import { classTeacherParamSchema, classStudentParamSchema, updateClassSchema, addTeacherSchema, createClassSchema, enrollStudentSchema, classIdParamSchema } from '../schemas/index';
 
 const router = Router();
 
-router.use(authenticate);
+router.use(authenticate, academyContext, requireAcademy);
 
 router.post('/', authorizeRole(['MASTER', 'ADMIN']), validateBody(createClassSchema), ClassController.create);
 router.get('/', authorizeRole(['MASTER', 'ADMIN', 'PROFESSOR', 'ALUNO']), ClassController.list);

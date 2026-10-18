@@ -36,6 +36,27 @@ export const updateAcademySchema = z.object({
   address: z.string().optional(),
 });
 
+export const createMasterAcademySchema = z.object({
+  name: z.string().min(2, 'Nome da academia deve ter pelo menos 2 caracteres'),
+  cnpj: z.string().optional(),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+  owner: z.object({
+    name: z.string().min(2, 'Nome do dono deve ter pelo menos 2 caracteres'),
+    email: z.string().email('E-mail inválido'),
+    password: z.string().min(6, 'Senha deve ter pelo menos 6 caracteres'),
+    phone: z.string().optional(),
+  }),
+});
+
+export const updateMasterAcademySchema = z.object({
+  name: z.string().min(2).optional(),
+  cnpj: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  address: z.string().nullable().optional(),
+  blockAfterDays: z.number().int().min(0).max(365).optional(),
+});
+
 // ===== Class Schemas =====
 
 export const createClassSchema = z.object({

@@ -20,11 +20,9 @@ const publicUser = {
 const isManagement = (role: string) => role === 'MASTER' || role === 'ADMIN';
 const isStaff = (role: string) => isManagement(role) || role === 'PROFESSOR';
 
-/** Busca usuário garantindo a mesma academia do token (MASTER sem academia enxerga todos). */
+/** Busca usuário garantindo a mesma academia do contexto (token, ou X-Academy-Id para MASTER). */
 async function findInTenant(id: string, req: AuthRequest) {
-  const where: any = { id };
-  if (req.user!.academyId) where.academyId = req.user!.academyId;
-  return prisma.user.findFirst({ where, select: publicUser });
+  return prisma.user.findFirst({ where: { id, academyId: req.user!.academyId as string }, select: publicUser });
 }
 
 /** guardianId precisa ser um RESPONSAVEL da mesma academia. */
@@ -39,15 +37,10 @@ async function isValidGuardian(guardianId: string, academyId: string | null): Pr
 export class UserController {
   static async list(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const { role, academyId } = req.user!;
-      const { search, filterRole } = req.query;
+      const { academyId } = req.user!;
+      const { search, filterRole, includeAdmins } = req.query;
 
-      const where: any = {};
-
-      // Multi-tenant isolation
-      if (role !== 'MASTER') {
-        where.academyId = academyId;
-      }
+      const where: any = { academyId };
 
       // Search filter
       if (search && typeof search === 'string') {
@@ -59,7 +52,7 @@ export class UserController {
 
       // Role filter
       if (filterRole && typeof filterRole === 'string') {
-        where.role = filterRole;
+        where.role = includeAdmins === 'true' && filterRole === 'PROFESSOR' ? { in: ['PROFESSOR', 'ADMIN'] } : filterRole;
       }
 
       const users = await prisma.user.findMany({
