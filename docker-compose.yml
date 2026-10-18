@@ -36,7 +36,7 @@ services:
       PORT: 3333
       NODE_ENV: development
       TZ: America/Sao_Paulo
-      CORS_ORIGINS: "http://localhost:8081,http://${HOST_IP:-localhost}:8081"
+      CORS_ORIGINS: "http://localhost:8081,http://${HOST_IP:-localhost}:8081,http://localhost:3000"
     develop:
       watch:
         - action: sync
@@ -81,6 +81,28 @@ services:
           path: ./frontend/package.json
         - action: rebuild
           path: ./frontend/app.json
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile.dev
+    container_name: rollflow_web
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_URL: "http://localhost:3333"
+      WATCHPACK_POLLING: "true"
+    develop:
+      watch:
+        - action: sync
+          path: ./web/src
+          target: /app/src
+        - action: rebuild
+          path: ./web/package.json
+        - action: rebuild
+          path: ./web/next.config.ts
 
 volumes:
   pgdata:
