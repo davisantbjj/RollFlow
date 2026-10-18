@@ -32,6 +32,9 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       const { logout } = useAuthStore.getState();
       logout();
+    } else if (error.response?.status === 403 && error.response.data?.code === 'BLOCKED') {
+      // Bloqueado durante o uso: o layout passa a mostrar só Financeiro e Perfil
+      useAuthStore.getState().setBlocked(true);
     }
     return Promise.reject(error);
   }

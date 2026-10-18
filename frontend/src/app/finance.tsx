@@ -59,11 +59,13 @@ const SUB_STATUS: Record<string, { label: string; color: string }> = {
 
 export default function Finance() {
   const { user } = useAuthStore();
-  return isManagement(user?.role) ? <ManagerFinance /> : <MyFinance />;
+  return isManagement(user?.role) && !user?.isBlocked ? <ManagerFinance /> : <MyFinance />;
 }
 
 // ---------------------------------------------------------------- Aluno / Responsável
 function MyFinance() {
+  const blocked = useAuthStore((s) => !!s.user?.isBlocked);
+  const setBlocked = useAuthStore((s) => s.setBlocked);
   const [data, setData] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -72,22 +74,27 @@ function MyFinance() {
   const load = useCallback(async () => {
     setError('');
     try {
-      const res = await api.get('/payments/me');
+      const [res, profile] = await Promise.all([api.get('/payments/me'), api.get('/users/profile')]);
       setData(res.data);
+      // Se a academia registrou o pagamento, o acesso completo volta na hora
+      setBlocked(!!profile.data.isBlocked);
     } catch (err) {
       setError(apiError(err, 'Não foi possível carregar seu financeiro.'));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [setBlocked]);
 
   useEffect(() => {
     load();
   }, [load]);
 
   const sub = data?.subscription;
-  const status = sub ? SUB_STATUS[sub.status] || { label: sub.status, color: Colors.muted } : null;
+  // Fatura vencida conta como atraso mesmo antes de a assinatura virar OVERDUE (prazo de carência)
+  const hasOverdue = !!data?.payments.some((p) => p.isOverdue);
+  const subStatus = sub && sub.status === 'ACTIVE' && hasOverdue ? 'OVERDUE' : sub?.status;
+  const status = subStatus ? SUB_STATUS[subStatus] || { label: subStatus, color: Colors.muted } : null;
 
   return (
     <Screen>
@@ -102,6 +109,15 @@ function MyFinance() {
             <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={Colors.gold} />
           }
         >
+          {blocked && (
+            <View style={styles.blockedBanner}>
+              <Text style={styles.blockedTitle}>Acesso bloqueado</Text>
+              <Text style={styles.blockedText}>
+                Sua mensalidade está em atraso. Regularize o pagamento com a academia para liberar as aulas e o
+                restante do app. Depois, puxe a tela para baixo para atualizar.
+              </Text>
+            </View>
+          )}
           {error ? (
             <ErrorState message={error} onRetry={load} />
           ) : !sub ? (
@@ -391,6 +407,16 @@ function PlansSection({ plans, academyId, onChanged }: { plans: Plan[]; academyI
 }
 
 const styles = StyleSheet.create({
+  blockedBanner: {
+    backgroundColor: 'rgba(232,75,75,0.12)',
+    borderColor: 'rgba(232,75,75,0.35)',
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 16,
+  },
+  blockedTitle: { color: Colors.red, fontWeight: 'bold', fontSize: 16, marginBottom: 4 },
+  blockedText: { color: Colors.text, opacity: 0.85, lineHeight: 20 },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 6 },
   muted: { color: Colors.muted, fontSize: 13, lineHeight: 19 },
   section: { fontSize: 20, color: Colors.text, fontWeight: 'bold', marginTop: 12, marginBottom: 12 },

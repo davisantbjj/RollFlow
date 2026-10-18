@@ -20,20 +20,27 @@ export default function RootLayout() {
   const navState = useRootNavigationState();
   const { token, user, hydrated } = useAuthStore();
 
-  const inLogin = (segments as string[])[0] === 'login';
+  const segment = (segments as string[])[0];
+  const inLogin = segment === 'login';
   const role = user?.role;
+  const blocked = !!user?.isBlocked;
+  const blockedAllowed = segment === 'finance' || segment === 'profile';
 
-  // Guarda de rota: sem token -> login; com token na tela de login -> início
+  // Guarda de rota: sem token -> login; com token na tela de login -> início;
+  // bloqueado (inadimplente) -> só Financeiro e Perfil
   useEffect(() => {
     if (!hydrated || !navState?.key) return;
     if (!token && !inLogin) router.replace('/login');
-    else if (token && inLogin) router.replace('/');
-  }, [hydrated, navState?.key, token, inLogin, router]);
+    else if (token && inLogin) router.replace(blocked ? '/finance' : '/');
+    else if (token && blocked && !blockedAllowed) router.replace('/finance');
+  }, [hydrated, navState?.key, token, inLogin, blocked, blockedAllowed, router]);
 
   const isManager = role === 'MASTER' || role === 'ADMIN';
-  const showClasses = role !== 'RESPONSAVEL';
-  const showStudents = isManager || role === 'PROFESSOR';
-  const showFinance = role !== 'PROFESSOR';
+  const showHome = !blocked;
+  const showFeed = !blocked;
+  const showClasses = role !== 'RESPONSAVEL' && !blocked;
+  const showStudents = (isManager || role === 'PROFESSOR') && !blocked;
+  const showFinance = role !== 'PROFESSOR' || blocked;
 
   return (
     <View style={{ flex: 1, backgroundColor: Colors.black }}>
@@ -59,7 +66,10 @@ export default function RootLayout() {
             tabBarLabelStyle: { fontSize: 11, fontWeight: '600', letterSpacing: 0.3 },
           }}
         >
-          <Tabs.Screen name="index" options={{ title: 'Início', tabBarIcon: icon('🏠') }} />
+          <Tabs.Screen
+            name="index"
+            options={{ title: 'Início', tabBarIcon: icon('🏠'), href: showHome ? undefined : null }}
+          />
           <Tabs.Screen
             name="classes"
             options={{ title: 'Turmas', tabBarIcon: icon('🥋'), href: showClasses ? undefined : null }}
@@ -68,7 +78,10 @@ export default function RootLayout() {
             name="students"
             options={{ title: 'Alunos', tabBarIcon: icon('👥'), href: showStudents ? undefined : null }}
           />
-          <Tabs.Screen name="feed" options={{ title: 'Feed', tabBarIcon: icon('📰') }} />
+          <Tabs.Screen
+            name="feed"
+            options={{ title: 'Feed', tabBarIcon: icon('📰'), href: showFeed ? undefined : null }}
+          />
           <Tabs.Screen
             name="finance"
             options={{ title: 'Financeiro', tabBarIcon: icon('💰'), href: showFinance ? undefined : null }}

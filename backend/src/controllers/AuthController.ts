@@ -15,11 +15,7 @@ export class AuthController {
         return;
       }
 
-      if (user.isBlocked) {
-        res.status(403).json({ error: 'Conta bloqueada. Entre em contato com a academia.' });
-        return;
-      }
-
+      // Usuário bloqueado consegue entrar, mas o authenticate só libera o financeiro dele
       const isValidPassword = await bcrypt.compare(password, user.password);
 
       if (!isValidPassword) {
@@ -43,6 +39,7 @@ export class AuthController {
           beltColor: user.beltColor,
           beltDegree: user.beltDegree,
           phone: user.phone,
+          isBlocked: user.isBlocked,
         },
         token,
       });

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { Role } from '@prisma/client';
+import { prisma } from '../index';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -10,7 +11,10 @@ export interface AuthRequest extends Request {
   };
 }
 
-export const authenticate = (req: AuthRequest, res: Response, next: NextFunction): void => {
+// Únicas rotas liberadas para usuário bloqueado (inadimplente): ver e pagar o próprio financeiro
+const BLOCKED_ALLOWED = ['GET /payments/me', 'GET /users/profile'];
+
+export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader) {
@@ -39,10 +43,27 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
       role: decoded.role,
       academyId: decoded.academyId,
     };
-    next();
   } catch (err) {
     res.status(401).json({ error: 'Token inválido ou expirado' });
     return;
+  }
+
+  try {
+    // O bloqueio pode mudar a qualquer momento, então é conferido no banco a cada requisição
+    const current = await prisma.user.findUnique({ where: { id: req.user.id }, select: { isBlocked: true } });
+    if (!current) {
+      res.status(401).json({ error: 'Usuário não encontrado' });
+      return;
+    }
+
+    const route = `${req.method} ${req.originalUrl.split('?')[0]}`;
+    if (current.isBlocked && !BLOCKED_ALLOWED.includes(route)) {
+      res.status(403).json({ error: 'Acesso bloqueado: regularize sua mensalidade.', code: 'BLOCKED' });
+      return;
+    }
+    next();
+  } catch (err) {
+    next(err);
   }
 };
 

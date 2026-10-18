@@ -22,6 +22,8 @@ export interface User {
   beltColor?: string;
   beltDegree?: number;
   phone?: string;
+  /** inadimplente: só acessa Financeiro e Perfil */
+  isBlocked?: boolean;
 }
 
 interface AuthState {
@@ -32,6 +34,7 @@ interface AuthState {
   hydrated: boolean;
   login: (user: User, token: string) => void;
   logout: () => void;
+  setBlocked: (isBlocked: boolean) => void;
   setLoading: (loading: boolean) => void;
 }
 
@@ -44,6 +47,8 @@ export const useAuthStore = create<AuthState>()(
       hydrated: false,
       login: (user, token) => set({ user, token, isLoading: false }),
       logout: () => set({ user: null, token: null }),
+      setBlocked: (isBlocked) =>
+        set((state) => (state.user && state.user.isBlocked !== isBlocked ? { user: { ...state.user, isBlocked } } : state)),
       setLoading: (isLoading) => set({ isLoading }),
     }),
     {

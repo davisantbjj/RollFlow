@@ -68,5 +68,7 @@ Regras gerais:
 ## Check-in
 - `POST /attendance` (existente): se já houver presença do aluno na mesma turma no mesmo dia → 409 `{ error: "Presença já registrada hoje" }`.
 
-## Login
-- `POST /auth/login` (existente) resposta inalterada.
+## Login e usuário bloqueado (inadimplente)
+- `POST /auth/login`: usuário bloqueado consegue entrar; `user.isBlocked` vem na resposta.
+- `authenticate` confere `isBlocked` no banco a cada requisição. Bloqueado só acessa `GET /payments/me` e `GET /users/profile`; o resto → 403 `{ error, code: "BLOCKED" }`.
+- App: bloqueado vê só as abas Financeiro e Perfil (com aviso); o Financeiro relê `/users/profile` e libera tudo quando a academia registra o pagamento.
