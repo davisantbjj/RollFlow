@@ -1,37 +1,45 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { Colors } from '../../theme/colors';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../services/api';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { ErrorState } from '../components/ui';
+import { apiError } from '../utils/notify';
 import BeltCard from '../components/BeltCard';
 
 export default function Progression() {
   const { user } = useAuthStore();
+  const params = useLocalSearchParams<{ studentId?: string; studentName?: string }>();
+  const studentId = (params.studentId as string) || user?.id;
+  const isOther = !!params.studentId && params.studentId !== user?.id;
   const router = useRouter();
   const [progression, setProgression] = useState<any>(null);
   const [evaluations, setEvaluations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const fetchData = useCallback(async () => {
+    if (!studentId) return;
+    setError('');
+    setLoading(true);
+    try {
+      const [progRes, evalRes] = await Promise.all([
+        api.get(`/progression/student/${studentId}`),
+        api.get(`/evaluation/student/${studentId}`),
+      ]);
+      setProgression(progRes.data);
+      setEvaluations(evalRes.data || []);
+    } catch (err) {
+      setError(apiError(err, 'Não foi possível carregar a evolução.'));
+    } finally {
+      setLoading(false);
+    }
+  }, [studentId]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        if (!user?.id) return;
-        const [progRes, evalRes] = await Promise.all([
-          api.get(`/progression/student/${user.id}`),
-          api.get(`/evaluation/student/${user.id}`),
-        ]);
-        setProgression(progRes.data);
-        setEvaluations(evalRes.data);
-      } catch (error) {
-        console.error('Error fetching progression data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchData();
-  }, [user?.id]);
+  }, [fetchData]);
 
   if (loading) {
     return (
@@ -46,16 +54,18 @@ export default function Progression() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} style={styles.backBtn}>
           <Text style={styles.backBtnText}>← Voltar</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Evolução</Text>
+        {isOther && params.studentName ? <Text style={styles.subtitle}>{params.studentName}</Text> : null}
       </View>
 
       <ScrollView style={styles.scroll}>
-        <BeltCard />
+        {error ? <ErrorState message={error} onRetry={fetchData} /> : null}
+        {!error && <BeltCard studentId={studentId} />}
 
-        {progression && (
+        {progression && progression.stats && progression.rule && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Métricas de Progresso</Text>
             
@@ -103,7 +113,7 @@ export default function Progression() {
               return (
                 <View key={ev.id} style={styles.evalCard}>
                   <View style={styles.evalHeader}>
-                    <Text style={styles.evalAuthor}>Por {ev.evaluator.name}</Text>
+                    <Text style={styles.evalAuthor}>Por {ev.evaluator?.name || 'Professor'}</Text>
                     <Text style={styles.evalDate}>{date}</Text>
                   </View>
                   <View style={styles.evalScores}>
@@ -111,9 +121,7 @@ export default function Progression() {
                     <Text style={styles.evalScore}>Disciplina: <Text style={styles.goldText}>{ev.discipline}</Text></Text>
                     <Text style={styles.evalScore}>Evolução: <Text style={styles.goldText}>{ev.evolution}</Text></Text>
                   </View>
-                  {ev.notes && (
-                    <Text style={styles.evalNotes}>"{ev.notes}"</Text>
-                  )}
+                  {ev.notes ? <Text style={styles.evalNotes}>"{ev.notes}"</Text> : null}
                 </View>
               );
             })
@@ -131,6 +139,7 @@ const styles = StyleSheet.create({
   backBtn: { marginBottom: 16 },
   backBtnText: { color: Colors.gold, fontSize: 16, fontWeight: 'bold' },
   title: { fontSize: 32, color: Colors.text, fontWeight: 'bold' },
+  subtitle: { fontSize: 16, color: Colors.muted, marginTop: 4 },
   scroll: { flex: 1 },
   
   section: {

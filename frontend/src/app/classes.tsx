@@ -1,39 +1,57 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, TextInput, Alert } from 'react-native';
-import { Colors } from '../../theme/colors';
-import { useAuthStore } from '../../store/authStore';
-import { api } from '../services/api';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Colors } from '../../theme/colors';
+import { Screen, Header, Loading, ErrorState, Empty, Button, Field, Chip, Badge, cardStyle } from '../components/ui';
+import { useAuthStore, isManagement, isStaff } from '../../store/authStore';
+import { api } from '../services/api';
+import { notify, confirmAction, apiError } from '../utils/notify';
+import { beltName } from '../utils/format';
 
 interface ClassItem {
   id: string;
   name: string;
-  description?: string;
-  dayOfWeek?: string;
-  startTime?: string;
-  endTime?: string;
-  maxStudents?: number;
+  description?: string | null;
+  dayOfWeek?: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  maxStudents?: number | null;
+  teachers?: { id: string; name: string }[];
   _count?: { students: number; teachers: number };
 }
 
+interface ClassDetail extends ClassItem {
+  teachers: { id: string; name: string }[];
+  students: { id: string; name: string; beltColor?: string | null; beltDegree?: number | null; isBlocked: boolean }[];
+}
+
+interface Person {
+  id: string;
+  name: string;
+}
+
+const EMPTY_FORM = { name: '', description: '', dayOfWeek: '', startTime: '', endTime: '', maxStudents: '' };
+type FormState = typeof EMPTY_FORM;
+
 export default function Classes() {
   const { user } = useAuthStore();
-  const router = useRouter();
+  const manager = isManagement(user?.role);
+  const staff = isStaff(user?.role);
+
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
   const [showCreate, setShowCreate] = useState(false);
-  const [newClass, setNewClass] = useState({ name: '', description: '', dayOfWeek: '', startTime: '', endTime: '' });
-  const [creating, setCreating] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
-  const isAdmin = user?.role === 'ADMIN' || user?.role === 'MASTER' || user?.role === 'PROFESSOR';
-
-  const fetchClasses = useCallback(async () => {
+  const load = useCallback(async () => {
+    setError('');
     try {
       const res = await api.get('/classes');
       setClasses(res.data || []);
-    } catch (error) {
-      console.error('Error fetching classes:', error);
+    } catch (err) {
+      setError(apiError(err, 'Não foi possível carregar as turmas.'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -41,292 +59,424 @@ export default function Classes() {
   }, []);
 
   useEffect(() => {
-    fetchClasses();
-  }, [fetchClasses]);
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchClasses();
-  };
-
-  const handleCreate = async () => {
-    if (!newClass.name.trim()) {
-      Alert.alert('Erro', 'Nome da turma é obrigatório');
-      return;
-    }
-
-    setCreating(true);
-    try {
-      await api.post('/classes', {
-        name: newClass.name.trim(),
-        description: newClass.description.trim() || undefined,
-        academyId: user?.academyId,
-        dayOfWeek: newClass.dayOfWeek.trim() || undefined,
-        startTime: newClass.startTime.trim() || undefined,
-        endTime: newClass.endTime.trim() || undefined,
-      });
-      setNewClass({ name: '', description: '', dayOfWeek: '', startTime: '', endTime: '' });
-      setShowCreate(false);
-      fetchClasses();
-    } catch (error: any) {
-      Alert.alert('Erro', error.response?.data?.error || 'Erro ao criar turma');
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.gold} />
-        </View>
-      </SafeAreaView>
-    );
-  }
+    load();
+  }, [load]);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Turmas</Text>
-        {isAdmin && (
-          <TouchableOpacity
-            style={styles.addBtn}
-            onPress={() => setShowCreate(!showCreate)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.addBtnText}>{showCreate ? '✕' : '+ Nova'}</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      <ScrollView
-        style={styles.scroll}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.gold} />}
-      >
-        {/* Create Form */}
-        {showCreate && (
-          <View style={styles.createForm}>
-            <Text style={styles.formTitle}>Nova Turma</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Nome da turma *"
-              placeholderTextColor={Colors.muted}
-              value={newClass.name}
-              onChangeText={(t) => setNewClass({ ...newClass, name: t })}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Descrição"
-              placeholderTextColor={Colors.muted}
-              value={newClass.description}
-              onChangeText={(t) => setNewClass({ ...newClass, description: t })}
-            />
-            <View style={styles.inputRow}>
-              <TextInput
-                style={[styles.input, styles.halfInput]}
-                placeholder="Dia (ex: Segunda)"
-                placeholderTextColor={Colors.muted}
-                value={newClass.dayOfWeek}
-                onChangeText={(t) => setNewClass({ ...newClass, dayOfWeek: t })}
-              />
-              <TextInput
-                style={[styles.input, styles.halfInput]}
-                placeholder="Horário (ex: 19:30)"
-                placeholderTextColor={Colors.muted}
-                value={newClass.startTime}
-                onChangeText={(t) => setNewClass({ ...newClass, startTime: t })}
-              />
-            </View>
-            <TouchableOpacity style={styles.createBtn} onPress={handleCreate} disabled={creating}>
-              {creating ? (
-                <ActivityIndicator color={Colors.black} size="small" />
-              ) : (
-                <Text style={styles.createBtnText}>Criar Turma</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Class List */}
-        {classes.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyIcon}>🥋</Text>
-            <Text style={styles.emptyText}>Nenhuma turma cadastrada</Text>
-            {isAdmin && <Text style={styles.emptySubtext}>Toque em "+ Nova" para criar a primeira turma</Text>}
-          </View>
-        ) : (
-          classes.map((cls) => (
-            <TouchableOpacity
-              key={cls.id}
-              style={styles.classCard}
-              onPress={() => {
-                if (isAdmin) {
-                  router.push({ pathname: '/checkin' as any, params: { classId: cls.id, className: cls.name } });
-                }
+    <Screen>
+      <Header
+        title="Turmas"
+        right={manager ? <Button label={showCreate ? 'Fechar' : '+ Nova'} variant={showCreate ? 'ghost' : 'gold'} onPress={() => setShowCreate(!showCreate)} /> : undefined}
+      />
+      {loading ? (
+        <Loading />
+      ) : (
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32 }}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={Colors.gold} />
+          }
+        >
+          {showCreate && (
+            <ClassForm
+              title="Nova turma"
+              submitLabel="Criar turma"
+              initial={EMPTY_FORM}
+              onCancel={() => setShowCreate(false)}
+              onSubmit={async (body) => {
+                // na criação, campos vazios simplesmente não são enviados
+                const clean = Object.fromEntries(Object.entries(body).filter(([, v]) => v !== null));
+                await api.post('/classes', { ...clean, academyId: user?.academyId });
+                notify.success('Turma criada.');
+                setShowCreate(false);
+                load();
               }}
-              activeOpacity={isAdmin ? 0.7 : 1}
-            >
-              <View style={styles.classCardHeader}>
-                <View style={styles.classTimeBox}>
-                  <Text style={styles.classTimeText}>{cls.startTime || '—'}</Text>
-                </View>
-                <View style={styles.classCardInfo}>
-                  <Text style={styles.classCardName}>{cls.name}</Text>
-                  {cls.description ? <Text style={styles.classCardDesc}>{cls.description}</Text> : null}
-                </View>
-              </View>
+            />
+          )}
 
-              <View style={styles.classCardFooter}>
-                <View style={styles.metaBadge}>
-                  <Text style={styles.metaBadgeText}>👥 {cls._count?.students || 0} alunos</Text>
-                </View>
-                {cls.dayOfWeek && (
-                  <View style={styles.metaBadge}>
-                    <Text style={styles.metaBadgeText}>📅 {cls.dayOfWeek}</Text>
-                  </View>
-                )}
-                {cls.endTime && (
-                  <View style={styles.metaBadge}>
-                    <Text style={styles.metaBadgeText}>⏰ {cls.startTime}–{cls.endTime}</Text>
-                  </View>
-                )}
-              </View>
+          {error ? (
+            <ErrorState message={error} onRetry={load} />
+          ) : classes.length === 0 ? (
+            <Empty icon="🥋" title="Nenhuma turma cadastrada" hint={manager ? 'Toque em "+ Nova" para criar a primeira turma.' : undefined} />
+          ) : (
+            classes.map((cls) => (
+              <ClassCard
+                key={cls.id}
+                cls={cls}
+                staff={staff}
+                manager={manager}
+                open={expanded === cls.id}
+                onToggle={() => setExpanded(expanded === cls.id ? null : cls.id)}
+                onChanged={load}
+              />
+            ))
+          )}
+        </ScrollView>
+      )}
+    </Screen>
+  );
+}
 
-              {isAdmin && (
-                <View style={styles.classCardActions}>
-                  <TouchableOpacity
-                    style={styles.chamadaBtn}
-                    onPress={() => router.push({ pathname: '/checkin' as any, params: { classId: cls.id, className: cls.name } })}
-                  >
-                    <Text style={styles.chamadaBtnText}>📋 Fazer Chamada</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
+// ------------------------------------------------------------------ Card + detalhe
+function ClassCard({ cls, staff, manager, open, onToggle, onChanged }: {
+  cls: ClassItem; staff: boolean; manager: boolean; open: boolean; onToggle: () => void; onChanged: () => void;
+}) {
+  const router = useRouter();
+  const teacherNames = (cls.teachers || []).map((t) => t.name).join(', ');
+
+  return (
+    <View style={cardStyle}>
+      <TouchableOpacity
+        onPress={staff ? onToggle : undefined}
+        activeOpacity={staff ? 0.7 : 1}
+        accessibilityRole={staff ? 'button' : undefined}
+        accessibilityLabel={staff ? `${open ? 'Fechar' : 'Abrir'} detalhes de ${cls.name}` : undefined}
+      >
+        <View style={styles.head}>
+          <View style={styles.timeBox}>
+            <Text style={styles.timeText}>{cls.startTime || '—'}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.name}>{cls.name}</Text>
+            {cls.description ? <Text style={styles.desc}>{cls.description}</Text> : null}
+          </View>
+          {staff && <Text style={styles.chevron}>{open ? '▲' : '▼'}</Text>}
+        </View>
+        <View style={styles.badges}>
+          {cls._count ? <Meta text={`👥 ${cls._count.students} ${cls._count.students === 1 ? 'aluno' : 'alunos'}`} /> : null}
+          {cls.dayOfWeek ? <Meta text={`📅 ${cls.dayOfWeek}`} /> : null}
+          {cls.endTime ? <Meta text={`⏰ ${cls.startTime}–${cls.endTime}`} /> : null}
+          {teacherNames ? <Meta text={`🥋 ${teacherNames}`} /> : null}
+        </View>
+      </TouchableOpacity>
+
+      {staff && (
+        <Button
+          label="Fazer chamada"
+          variant="blue"
+          style={{ marginTop: 14 }}
+          onPress={() => router.push({ pathname: '/checkin' as any, params: { classId: cls.id, className: cls.name } })}
+        />
+      )}
+
+      {open && staff && <ClassDetailPanel cls={cls} manager={manager} onChanged={onChanged} />}
+    </View>
+  );
+}
+
+function Meta({ text }: { text: string }) {
+  return (
+    <View style={styles.meta}>
+      <Text style={styles.metaText}>{text}</Text>
+    </View>
+  );
+}
+
+function ClassDetailPanel({ cls, manager, onChanged }: { cls: ClassItem; manager: boolean; onChanged: () => void }) {
+  const [detail, setDetail] = useState<ClassDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [picker, setPicker] = useState<null | 'teacher' | 'student'>(null);
+  const [people, setPeople] = useState<Person[]>([]);
+  const [peopleLoading, setPeopleLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    setError('');
+    try {
+      const res = await api.get(`/classes/${cls.id}`);
+      setDetail(res.data);
+    } catch (err) {
+      setError(apiError(err, 'Não foi possível carregar a turma.'));
+    } finally {
+      setLoading(false);
+    }
+  }, [cls.id]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const refreshAll = async () => {
+    await load();
+    onChanged();
+  };
+
+  const openPicker = async (kind: 'teacher' | 'student') => {
+    if (picker === kind) {
+      setPicker(null);
+      return;
+    }
+    setPicker(kind);
+    setPeopleLoading(true);
+    try {
+      const res = await api.get('/users', kind === 'student' ? { params: { filterRole: 'ALUNO' } } : undefined);
+      const all: (Person & { role?: string })[] = res.data || [];
+      setPeople(kind === 'teacher' ? all.filter((u) => ['MASTER', 'ADMIN', 'PROFESSOR'].includes(u.role || '')) : all);
+    } catch (err) {
+      notify.error(apiError(err, 'Não foi possível carregar a lista.'));
+      setPicker(null);
+    } finally {
+      setPeopleLoading(false);
+    }
+  };
+
+  const run = async (fn: () => Promise<any>, okMsg: string, failMsg: string) => {
+    setBusy(true);
+    try {
+      await fn();
+      notify.success(okMsg);
+      await refreshAll();
+    } catch (err) {
+      notify.error(apiError(err, failMsg));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addTeacher = (p: Person) =>
+    run(() => api.post(`/classes/${cls.id}/teachers`, { teacherId: p.id }), 'Professor vinculado.', 'Não foi possível vincular o professor.');
+  const enroll = (p: Person) =>
+    run(() => api.post(`/classes/${cls.id}/enroll`, { studentId: p.id }), 'Aluno matriculado.', 'Não foi possível matricular o aluno.');
+
+  const removeTeacher = async (t: Person) => {
+    if (!(await confirmAction({ title: 'Remover professor', message: `Remover ${t.name} desta turma?`, confirmText: 'Remover', destructive: true }))) return;
+    run(() => api.delete(`/classes/${cls.id}/teachers/${t.id}`), 'Professor removido.', 'Não foi possível remover o professor.');
+  };
+  const removeStudent = async (s: Person) => {
+    if (!(await confirmAction({ title: 'Remover aluno', message: `Remover ${s.name} desta turma?`, confirmText: 'Remover', destructive: true }))) return;
+    run(() => api.delete(`/classes/${cls.id}/enroll/${s.id}`), 'Aluno removido da turma.', 'Não foi possível remover o aluno.');
+  };
+
+  const deleteClass = async () => {
+    const ok = await confirmAction({
+      title: 'Excluir turma',
+      message: `"${cls.name}" será excluída junto com matrículas e presenças. Não dá para desfazer.`,
+      confirmText: 'Excluir turma',
+      destructive: true,
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await api.delete(`/classes/${cls.id}`);
+      notify.success('Turma excluída.');
+      onChanged();
+    } catch (err) {
+      notify.error(apiError(err, 'Não foi possível excluir a turma.'));
+      setBusy(false);
+    }
+  };
+
+  if (loading) return <View style={styles.panel}><Loading /></View>;
+  if (error || !detail) return <View style={styles.panel}><ErrorState message={error || 'Turma não encontrada.'} onRetry={load} /></View>;
+
+  const enrolledIds = new Set(detail.students.map((s) => s.id));
+  const teacherIds = new Set(detail.teachers.map((t) => t.id));
+  const available = people.filter((p) => !(picker === 'teacher' ? teacherIds : enrolledIds).has(p.id));
+
+  return (
+    <View style={styles.panel}>
+      {editing ? (
+        <ClassForm
+          title="Editar turma"
+          submitLabel="Salvar alterações"
+          initial={{
+            name: detail.name,
+            description: detail.description || '',
+            dayOfWeek: detail.dayOfWeek || '',
+            startTime: detail.startTime || '',
+            endTime: detail.endTime || '',
+            maxStudents: detail.maxStudents ? String(detail.maxStudents) : '',
+          }}
+          onCancel={() => setEditing(false)}
+          onSubmit={async (body) => {
+            await api.put(`/classes/${cls.id}`, body);
+            notify.success('Turma atualizada.');
+            setEditing(false);
+            await refreshAll();
+          }}
+        />
+      ) : null}
+
+      <View style={styles.sectionRow}>
+        <Text style={styles.sectionTitle}>Professores</Text>
+        {manager && <Chip label={picker === 'teacher' ? 'Fechar' : '+ Vincular'} onPress={() => openPicker('teacher')} />}
+      </View>
+      {picker === 'teacher' && (
+        <Picker loading={peopleLoading} people={available} emptyText="Nenhum professor disponível para vincular." onPick={addTeacher} />
+      )}
+      {detail.teachers.length === 0 ? (
+        <Text style={styles.emptyLine}>Nenhum professor vinculado.</Text>
+      ) : (
+        detail.teachers.map((t) => (
+          <PersonRow key={t.id} name={t.name} onRemove={manager ? () => removeTeacher(t) : undefined} disabled={busy} />
+        ))
+      )}
+
+      <View style={[styles.sectionRow, { marginTop: 18 }]}>
+        <Text style={styles.sectionTitle}>Alunos ({detail.students.length})</Text>
+        {manager && <Chip label={picker === 'student' ? 'Fechar' : '+ Matricular'} onPress={() => openPicker('student')} />}
+      </View>
+      {picker === 'student' && (
+        <Picker loading={peopleLoading} people={available} emptyText="Todos os alunos já estão nesta turma." onPick={enroll} />
+      )}
+      {detail.students.length === 0 ? (
+        <Text style={styles.emptyLine}>Nenhum aluno matriculado.</Text>
+      ) : (
+        detail.students.map((s) => (
+          <PersonRow
+            key={s.id}
+            name={s.name}
+            sub={`Faixa ${beltName(s.beltColor)} · ${s.beltDegree || 0}º grau`}
+            badge={s.isBlocked ? 'Bloqueado' : undefined}
+            onRemove={manager ? () => removeStudent(s) : undefined}
+            disabled={busy}
+          />
+        ))
+      )}
+
+      {manager && !editing && (
+        <View style={styles.panelActions}>
+          <Button label="Editar turma" variant="ghost" onPress={() => setEditing(true)} />
+          <Button label="Excluir turma" variant="danger" onPress={deleteClass} loading={busy} />
+        </View>
+      )}
+    </View>
+  );
+}
+
+function PersonRow({ name, sub, badge, onRemove, disabled }: {
+  name: string; sub?: string; badge?: string; onRemove?: () => void; disabled?: boolean;
+}) {
+  return (
+    <View style={styles.person}>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.personName}>{name}</Text>
+        {sub ? <Text style={styles.personSub}>{sub}</Text> : null}
+      </View>
+      {badge ? <Badge label={badge} color={Colors.red} /> : null}
+      {onRemove && (
+        <TouchableOpacity onPress={onRemove} disabled={disabled} accessibilityRole="button" accessibilityLabel={`Remover ${name}`} style={styles.removeBtn}>
+          <Text style={styles.removeText}>Remover</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+function Picker({ loading, people, emptyText, onPick }: {
+  loading: boolean; people: Person[]; emptyText: string; onPick: (p: Person) => void;
+}) {
+  return (
+    <View style={styles.picker}>
+      {loading ? (
+        <Text style={styles.emptyLine}>Carregando...</Text>
+      ) : people.length === 0 ? (
+        <Text style={styles.emptyLine}>{emptyText}</Text>
+      ) : (
+        <ScrollView style={{ maxHeight: 220 }} nestedScrollEnabled>
+          {people.map((p) => (
+            <TouchableOpacity key={p.id} style={styles.pickerItem} onPress={() => onPick(p)} accessibilityRole="button">
+              <Text style={styles.personName}>{p.name}</Text>
+              <Text style={styles.addText}>Adicionar</Text>
             </TouchableOpacity>
-          ))
-        )}
-      </ScrollView>
-    </SafeAreaView>
+          ))}
+        </ScrollView>
+      )}
+    </View>
+  );
+}
+
+// ------------------------------------------------------------------ Formulário
+function ClassForm({ title, submitLabel, initial, onSubmit, onCancel }: {
+  title: string;
+  submitLabel: string;
+  initial: FormState;
+  onSubmit: (body: Record<string, unknown>) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [form, setForm] = useState<FormState>(initial);
+  const [errors, setErrors] = useState<Partial<FormState>>({});
+  const [saving, setSaving] = useState(false);
+  const set = (k: keyof FormState) => (t: string) => setForm((f) => ({ ...f, [k]: t }));
+
+  const submit = async () => {
+    const next: Partial<FormState> = {};
+    if (form.name.trim().length < 2) next.name = 'Informe o nome da turma (mín. 2 letras).';
+    const timeRe = /^([01]?\d|2[0-3]):[0-5]\d$/;
+    if (form.startTime.trim() && !timeRe.test(form.startTime.trim())) next.startTime = 'Use o formato 19:30.';
+    if (form.endTime.trim() && !timeRe.test(form.endTime.trim())) next.endTime = 'Use o formato 20:30.';
+    const max = form.maxStudents.trim() ? Number(form.maxStudents) : null;
+    if (max !== null && (!Number.isInteger(max) || max <= 0)) next.maxStudents = 'Informe um número inteiro maior que zero.';
+    setErrors(next);
+    if (Object.keys(next).length) return;
+
+    setSaving(true);
+    try {
+      await onSubmit({
+        name: form.name.trim(),
+        description: form.description.trim() || null,
+        dayOfWeek: form.dayOfWeek.trim() || null,
+        startTime: form.startTime.trim() || null,
+        endTime: form.endTime.trim() || null,
+        maxStudents: max,
+      });
+    } catch (err) {
+      notify.error(apiError(err, 'Não foi possível salvar a turma.'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <View style={[cardStyle, { borderColor: Colors.gold }]}>
+      <Text style={styles.formTitle}>{title}</Text>
+      <Field label="Nome da turma" value={form.name} onChangeText={set('name')} error={errors.name} />
+      <Field label="Descrição (opcional)" value={form.description} onChangeText={set('description')} />
+      <Field label="Dia da semana" value={form.dayOfWeek} onChangeText={set('dayOfWeek')} placeholder="Ex.: Segunda e quarta" />
+      <View style={styles.twoCols}>
+        <View style={{ flex: 1 }}>
+          <Field label="Início" value={form.startTime} onChangeText={set('startTime')} error={errors.startTime} placeholder="19:30" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Field label="Fim" value={form.endTime} onChangeText={set('endTime')} error={errors.endTime} placeholder="20:30" />
+        </View>
+      </View>
+      <Field label="Limite de alunos (opcional)" value={form.maxStudents} onChangeText={set('maxStudents')} error={errors.maxStudents} keyboardType="number-pad" />
+      <View style={styles.panelActions}>
+        <Button label="Cancelar" variant="ghost" onPress={onCancel} />
+        <Button label={submitLabel} onPress={submit} loading={saving} />
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.black },
-  scroll: { flex: 1, paddingHorizontal: 20 },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 24,
-    paddingTop: 40,
-  },
-  title: { fontSize: 32, color: Colors.text, fontWeight: 'bold' },
-  addBtn: {
-    backgroundColor: Colors.gold,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
-  },
-  addBtnText: { color: Colors.black, fontWeight: 'bold', fontSize: 14 },
-
-  // Create Form
-  createForm: {
-    backgroundColor: Colors.card,
-    borderColor: Colors.gold,
-    borderWidth: 1,
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 20,
-  },
-  formTitle: { fontSize: 18, color: Colors.gold, fontWeight: 'bold', marginBottom: 16 },
-  input: {
-    backgroundColor: Colors.card2,
-    borderColor: Colors.border,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 14,
-    color: Colors.text,
-    fontSize: 15,
-    marginBottom: 12,
-  },
-  inputRow: { flexDirection: 'row', gap: 12 },
-  halfInput: { flex: 1 },
-  createBtn: {
-    backgroundColor: Colors.gold,
-    padding: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  createBtnText: { color: Colors.black, fontWeight: 'bold', fontSize: 16 },
-
-  // Class Cards
-  classCard: {
-    backgroundColor: Colors.card,
-    borderColor: Colors.border,
-    borderWidth: 1,
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 12,
-  },
-  classCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 12,
-  },
-  classTimeBox: {
-    backgroundColor: Colors.gold,
-    borderRadius: 14,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 55,
-  },
-  classTimeText: { fontSize: 16, color: '#000', fontWeight: 'bold' },
-  classCardInfo: { flex: 1 },
-  classCardName: { fontSize: 18, color: Colors.text, fontWeight: 'bold' },
-  classCardDesc: { fontSize: 13, color: Colors.muted, marginTop: 4 },
-  classCardFooter: {
-    flexDirection: 'row',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  metaBadge: {
-    backgroundColor: Colors.card2,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  metaBadgeText: { color: Colors.muted, fontSize: 12, fontWeight: '600' },
-  classCardActions: {
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    marginTop: 14,
-    paddingTop: 14,
-  },
-  chamadaBtn: {
-    backgroundColor: Colors.blue,
-    padding: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  chamadaBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
-
-  // Empty State
-  emptyCard: {
-    backgroundColor: Colors.card,
-    borderColor: Colors.border,
-    borderWidth: 1,
-    borderRadius: 20,
-    padding: 40,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  emptyIcon: { fontSize: 48, marginBottom: 16 },
-  emptyText: { color: Colors.muted, fontSize: 18, textAlign: 'center', fontWeight: '600' },
-  emptySubtext: { color: Colors.border, fontSize: 14, marginTop: 8, textAlign: 'center' },
+  head: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 12 },
+  timeBox: { backgroundColor: Colors.gold, borderRadius: 14, paddingVertical: 8, paddingHorizontal: 12, minWidth: 58, alignItems: 'center' },
+  timeText: { fontSize: 16, color: '#000', fontWeight: 'bold' },
+  name: { fontSize: 18, color: Colors.text, fontWeight: 'bold' },
+  desc: { fontSize: 13, color: Colors.muted, marginTop: 4 },
+  chevron: { color: Colors.muted, fontSize: 12 },
+  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  meta: { backgroundColor: Colors.card2, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
+  metaText: { color: Colors.muted, fontSize: 12, fontWeight: '600' },
+  panel: { borderTopWidth: 1, borderTopColor: Colors.border, marginTop: 16, paddingTop: 16 },
+  sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  sectionTitle: { color: Colors.text, fontWeight: 'bold', fontSize: 15 },
+  emptyLine: { color: Colors.muted, fontSize: 13, paddingVertical: 6 },
+  person: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  personName: { color: Colors.text, fontSize: 14, fontWeight: '600' },
+  personSub: { color: Colors.muted, fontSize: 12, marginTop: 2 },
+  removeBtn: { paddingHorizontal: 10, paddingVertical: 8, minHeight: 36, justifyContent: 'center' },
+  removeText: { color: Colors.red, fontWeight: 'bold', fontSize: 13 },
+  panelActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 18 },
+  picker: { backgroundColor: Colors.card2, borderRadius: 12, paddingHorizontal: 12, marginBottom: 10 },
+  pickerItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, minHeight: 44 },
+  addText: { color: Colors.gold, fontWeight: 'bold', fontSize: 13 },
+  formTitle: { color: Colors.gold, fontSize: 18, fontWeight: 'bold', marginBottom: 14 },
+  twoCols: { flexDirection: 'row', gap: 12 },
 });

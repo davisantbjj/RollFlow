@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Colors } from '../../theme/colors';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../services/api';
-import { useRouter } from 'expo-router';
+import { ErrorState } from '../components/ui';
+import { confirmAction, apiError } from '../utils/notify';
 
 interface UserProfile {
   id: string;
@@ -19,17 +20,17 @@ interface UserProfile {
 
 export default function Profile() {
   const { logout, user } = useAuthStore();
-  const router = useRouter();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const fetchProfile = async () => {
       try {
         const res = await api.get('/users/profile');
         setProfile(res.data);
-      } catch (error) {
-        console.error('Error fetching profile:', error);
+      } catch (err) {
+        setError(apiError(err, 'Não foi possível carregar seu perfil.'));
       } finally {
         setLoading(false);
       }
@@ -37,18 +38,14 @@ export default function Profile() {
     fetchProfile();
   }, []);
 
-  const handleLogout = () => {
-    Alert.alert('Sair', 'Tem certeza que deseja sair do aplicativo?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { 
-        text: 'Sair', 
-        style: 'destructive',
-        onPress: () => {
-          logout();
-          router.replace('/login');
-        }
-      }
-    ]);
+  const handleLogout = async () => {
+    const ok = await confirmAction({
+      title: 'Sair da conta',
+      message: 'Tem certeza que deseja sair do aplicativo?',
+      confirmText: 'Sair',
+      destructive: true,
+    });
+    if (ok) logout();
   };
 
   if (loading) {
@@ -76,6 +73,7 @@ export default function Profile() {
       </View>
 
       <ScrollView style={styles.scroll}>
+        {error ? <ErrorState message={error} /> : null}
         <View style={styles.avatarSection}>
           <View style={styles.avatarPlaceholder}>
             <Text style={styles.avatarInitials}>

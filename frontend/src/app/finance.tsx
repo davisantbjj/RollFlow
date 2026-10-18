@@ -1,101 +1,412 @@
-import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { Colors } from '../../theme/colors';
-import { useAuthStore } from '../../store/authStore';
+import { Screen, Header, Loading, ErrorState, Empty, Button, Field, Chip, Badge, cardStyle } from '../components/ui';
+import { useAuthStore, isManagement } from '../../store/authStore';
+import { api } from '../services/api';
+import { notify, confirmAction, apiError } from '../utils/notify';
+import { money, dateBR, INTERVALS } from '../utils/format';
+
+interface PaymentMe {
+  id: string;
+  amount: number;
+  status: 'PENDING' | 'PAID' | string;
+  dueDate: string;
+  paymentDate: string | null;
+  isOverdue: boolean;
+}
+
+interface Me {
+  subscription: {
+    id: string;
+    status: string;
+    dueDate: string;
+    plan: { id: string; name: string; price: number; interval: string };
+  } | null;
+  payments: PaymentMe[];
+}
+
+interface Overview {
+  monthRevenue: number;
+  overdueTotal: number;
+  overdueCount: number;
+  pendingCount: number;
+  payments: {
+    id: string;
+    amount: number;
+    status: string;
+    dueDate: string;
+    isOverdue: boolean;
+    user: { id: string; name: string };
+    plan: { id: string; name: string };
+  }[];
+}
+
+interface Plan {
+  id: string;
+  name: string;
+  description?: string | null;
+  price: number;
+  interval: string;
+  isActive?: boolean;
+}
+
+const SUB_STATUS: Record<string, { label: string; color: string }> = {
+  ACTIVE: { label: 'Em dia', color: Colors.green },
+  OVERDUE: { label: 'Em atraso', color: Colors.red },
+  CANCELED: { label: 'Cancelada', color: Colors.muted },
+};
 
 export default function Finance() {
   const { user } = useAuthStore();
-  const isAdmin = user?.role === 'ADMIN' || user?.role === 'MASTER';
+  return isManagement(user?.role) ? <ManagerFinance /> : <MyFinance />;
+}
 
-  if (isAdmin) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <ScrollView style={styles.scroll}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Financeiro <Text style={styles.highlight}>Admin</Text></Text>
-          </View>
-          
-          <View style={styles.alertCard}>
-            <Text style={styles.alertTitle}>2 Mensalidades Atrasadas</Text>
-            <Text style={styles.alertSub}>Total: R$ 340,00</Text>
-          </View>
+// ---------------------------------------------------------------- Aluno / Responsável
+function MyFinance() {
+  const [data, setData] = useState<Me | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
 
-          <Text style={styles.sectionTitle}>Planos Ativos</Text>
-          <View style={styles.planCard}>
-            <Text style={styles.planName}>Plano Ouro (Anual)</Text>
-            <Text style={styles.planPrice}>R$ 170,00 / mês</Text>
-            <Text style={styles.planMeta}>45 alunos inscritos</Text>
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
+  const load = useCallback(async () => {
+    setError('');
+    try {
+      const res = await api.get('/payments/me');
+      setData(res.data);
+    } catch (err) {
+      setError(apiError(err, 'Não foi possível carregar seu financeiro.'));
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
-  // Aluno view
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const sub = data?.subscription;
+  const status = sub ? SUB_STATUS[sub.status] || { label: sub.status, color: Colors.muted } : null;
+
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scroll}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Minha <Text style={styles.highlight}>Assinatura</Text></Text>
-        </View>
+    <Screen>
+      <Header title="Financeiro" />
+      {loading ? (
+        <Loading />
+      ) : (
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={Colors.gold} />
+          }
+        >
+          {error ? (
+            <ErrorState message={error} onRetry={load} />
+          ) : !sub ? (
+            <Empty icon="💳" title="Você ainda não tem um plano" hint="Fale com a academia para contratar um plano." />
+          ) : (
+            <View style={[cardStyle, { borderColor: status?.color }]}>
+              <View style={styles.rowBetween}>
+                <Text style={styles.planName}>{sub.plan.name}</Text>
+                {status && <Badge label={status.label} color={status.color} />}
+              </View>
+              <Text style={styles.planPrice}>
+                {money(sub.plan.price)} <Text style={styles.muted}>/ {(INTERVALS[sub.plan.interval] || sub.plan.interval).toLowerCase()}</Text>
+              </Text>
+              <Text style={styles.muted}>Próximo vencimento: {dateBR(sub.dueDate)}</Text>
+            </View>
+          )}
 
-        <View style={styles.planCard}>
-          <View style={styles.statusBadgeActive}>
-            <Text style={styles.statusTextActive}>Ativa</Text>
+          {!error && (
+            <>
+              <Text style={styles.section}>Histórico</Text>
+              {(data?.payments || []).length === 0 ? (
+                <Empty title="Nenhuma cobrança ainda" />
+              ) : (
+                data!.payments.map((p) => {
+                  const paid = p.status === 'PAID';
+                  const color = paid ? Colors.green : p.isOverdue ? Colors.red : Colors.gold;
+                  const label = paid ? 'Pago' : p.isOverdue ? 'Atrasado' : 'Pendente';
+                  return (
+                    <View key={p.id} style={cardStyle}>
+                      <View style={styles.rowBetween}>
+                        <Text style={styles.amount}>{money(p.amount)}</Text>
+                        <Badge label={label} color={color} />
+                      </View>
+                      <Text style={styles.muted}>
+                        Vence em {dateBR(p.dueDate)}
+                        {paid && p.paymentDate ? ` · pago em ${dateBR(p.paymentDate)}` : ''}
+                      </Text>
+                      {!paid && (
+                        <Button
+                          label="Pagar"
+                          variant="ghost"
+                          style={{ marginTop: 12, alignSelf: 'flex-start' }}
+                          onPress={() => notify.info('Em breve: pagamento por PIX.')}
+                        />
+                      )}
+                    </View>
+                  );
+                })
+              )}
+            </>
+          )}
+        </ScrollView>
+      )}
+    </Screen>
+  );
+}
+
+// ---------------------------------------------------------------- Gestão
+function ManagerFinance() {
+  const { user } = useAuthStore();
+  const [overview, setOverview] = useState<Overview | null>(null);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
+  const [payingId, setPayingId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setError('');
+    try {
+      const [ov, pl] = await Promise.all([api.get('/payments/overview'), api.get('/plans')]);
+      setOverview(ov.data);
+      setPlans((pl.data || []).filter((p: Plan) => p.isActive !== false));
+    } catch (err) {
+      setError(apiError(err, 'Não foi possível carregar o financeiro.'));
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const markPaid = async (id: string, name: string) => {
+    const ok = await confirmAction({
+      title: 'Marcar como pago',
+      message: `Confirmar o recebimento da mensalidade de ${name}?`,
+      confirmText: 'Marcar como pago',
+    });
+    if (!ok) return;
+    setPayingId(id);
+    try {
+      await api.post(`/payments/${id}/pay`);
+      notify.success('Pagamento registrado.');
+      load();
+    } catch (err) {
+      notify.error(apiError(err, 'Não foi possível registrar o pagamento.'));
+    } finally {
+      setPayingId(null);
+    }
+  };
+
+  return (
+    <Screen>
+      <Header title="Financeiro" />
+      {loading ? (
+        <Loading />
+      ) : (
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32 }}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={Colors.gold} />
+          }
+        >
+          {error ? (
+            <ErrorState message={error} onRetry={load} />
+          ) : (
+            <>
+              <View style={styles.cardsRow}>
+                <Summary label="Receita do mês" value={money(overview?.monthRevenue)} color={Colors.green} />
+                <Summary label="Em atraso" value={money(overview?.overdueTotal)} color={(overview?.overdueCount ?? 0) > 0 ? Colors.red : Colors.text} />
+              </View>
+              <View style={styles.cardsRow}>
+                <Summary label="Atrasadas" value={String(overview?.overdueCount ?? 0)} />
+                <Summary label="Pendentes" value={String(overview?.pendingCount ?? 0)} />
+              </View>
+
+              <Text style={styles.section}>Cobranças abertas</Text>
+              {(overview?.payments || []).length === 0 ? (
+                <Empty icon="✅" title="Nenhuma cobrança pendente" hint="Quando houver mensalidades a receber, elas aparecem aqui." />
+              ) : (
+                overview!.payments.map((p) => (
+                  <View key={p.id} style={[cardStyle, p.isOverdue && { borderColor: 'rgba(232,75,75,0.5)' }]}>
+                    <View style={styles.rowBetween}>
+                      <Text style={styles.amount} numberOfLines={1}>{p.user.name}</Text>
+                      <Badge label={p.isOverdue ? 'Atrasado' : 'Pendente'} color={p.isOverdue ? Colors.red : Colors.gold} />
+                    </View>
+                    <Text style={styles.muted}>
+                      {p.plan.name} · {money(p.amount)} · vence em {dateBR(p.dueDate)}
+                    </Text>
+                    <Button
+                      label="Marcar como pago"
+                      variant="green"
+                      loading={payingId === p.id}
+                      onPress={() => markPaid(p.id, p.user.name)}
+                      style={{ marginTop: 12, alignSelf: 'flex-start' }}
+                    />
+                  </View>
+                ))
+              )}
+
+              <PlansSection plans={plans} academyId={user?.academyId || undefined} onChanged={load} />
+            </>
+          )}
+        </ScrollView>
+      )}
+    </Screen>
+  );
+}
+
+function Summary({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <View style={styles.summary}>
+      <Text style={[styles.summaryValue, color ? { color } : null]} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
+      <Text style={styles.summaryLabel}>{label}</Text>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------- Planos
+const EMPTY_FORM = { name: '', price: '', description: '', interval: 'MONTHLY' };
+
+function PlansSection({ plans, academyId, onChanged }: { plans: Plan[]; academyId?: string; onChanged: () => void }) {
+  const [editing, setEditing] = useState<string | 'new' | null>(null);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [errors, setErrors] = useState<{ name?: string; price?: string }>({});
+  const [saving, setSaving] = useState(false);
+
+  const open = (plan?: Plan) => {
+    setErrors({});
+    if (plan) {
+      setForm({ name: plan.name, price: String(plan.price).replace('.', ','), description: plan.description || '', interval: plan.interval });
+      setEditing(plan.id);
+    } else {
+      setForm(EMPTY_FORM);
+      setEditing('new');
+    }
+  };
+
+  const save = async () => {
+    const price = Number(form.price.replace(/\./g, '').replace(',', '.'));
+    const next: typeof errors = {};
+    if (form.name.trim().length < 2) next.name = 'Informe o nome do plano (mín. 2 letras).';
+    if (!form.price.trim() || isNaN(price) || price <= 0) next.price = 'Informe um valor maior que zero.';
+    setErrors(next);
+    if (Object.keys(next).length) return;
+
+    setSaving(true);
+    try {
+      const body = {
+        name: form.name.trim(),
+        description: form.description.trim() || null,
+        price,
+        interval: form.interval,
+      };
+      if (editing === 'new') await api.post('/plans', { ...body, description: body.description || undefined, academyId });
+      else await api.put(`/plans/${editing}`, body);
+      notify.success(editing === 'new' ? 'Plano criado.' : 'Plano atualizado.');
+      setEditing(null);
+      onChanged();
+    } catch (err) {
+      notify.error(apiError(err, 'Não foi possível salvar o plano.'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deactivate = async (plan: Plan) => {
+    const ok = await confirmAction({
+      title: 'Desativar plano',
+      message: `"${plan.name}" deixará de ser oferecido. Assinaturas existentes continuam.`,
+      confirmText: 'Desativar',
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await api.delete(`/plans/${plan.id}`);
+      notify.success('Plano desativado.');
+      onChanged();
+    } catch (err) {
+      notify.error(apiError(err, 'Não foi possível desativar o plano.'));
+    }
+  };
+
+  return (
+    <View>
+      <View style={[styles.rowBetween, { marginTop: 16, marginBottom: 12 }]}>
+        <Text style={[styles.section, { marginTop: 0, marginBottom: 0 }]}>Planos</Text>
+        {editing === null && <Button label="+ Novo plano" onPress={() => open()} />}
+      </View>
+
+      {editing !== null && (
+        <View style={[cardStyle, { borderColor: Colors.gold }]}>
+          <Text style={styles.formTitle}>{editing === 'new' ? 'Novo plano' : 'Editar plano'}</Text>
+          <Field label="Nome" value={form.name} onChangeText={(t) => setForm({ ...form, name: t })} error={errors.name} placeholder="Ex.: Mensal ilimitado" />
+          <Field label="Valor (R$)" value={form.price} onChangeText={(t) => setForm({ ...form, price: t })} error={errors.price} keyboardType="decimal-pad" placeholder="170,00" />
+          <Field label="Descrição (opcional)" value={form.description} onChangeText={(t) => setForm({ ...form, description: t })} />
+          <Text style={styles.chipLabel}>Cobrança</Text>
+          <View style={styles.chips}>
+            {Object.entries(INTERVALS).map(([k, v]) => (
+              <Chip key={k} label={v} active={form.interval === k} onPress={() => setForm({ ...form, interval: k })} />
+            ))}
           </View>
-          <Text style={styles.planName}>Plano Ouro (Anual)</Text>
-          <Text style={styles.planPrice}>R$ 170,00 / mês</Text>
-          <Text style={styles.planMeta}>Vencimento: 10/07/2026</Text>
-          <TouchableOpacity style={styles.payBtn}>
-            <Text style={styles.payBtnText}>Pagar Fatura (PIX)</Text>
-          </TouchableOpacity>
+          <View style={styles.formActions}>
+            <Button label="Cancelar" variant="ghost" onPress={() => setEditing(null)} />
+            <Button label="Salvar plano" onPress={save} loading={saving} />
+          </View>
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      )}
+
+      {plans.length === 0 ? (
+        <Empty title="Nenhum plano ativo" hint="Crie um plano para cobrar seus alunos." />
+      ) : (
+        plans.map((plan) => (
+          <View key={plan.id} style={cardStyle}>
+            <View style={styles.rowBetween}>
+              <Text style={styles.amount}>{plan.name}</Text>
+              <Text style={styles.planGold}>{money(plan.price)}</Text>
+            </View>
+            <Text style={styles.muted}>
+              {INTERVALS[plan.interval] || plan.interval}
+              {plan.description ? ` · ${plan.description}` : ''}
+            </Text>
+            <View style={styles.formActions}>
+              <Button label="Editar" variant="ghost" onPress={() => open(plan)} />
+              <Button label="Desativar" variant="danger" onPress={() => deactivate(plan)} />
+            </View>
+          </View>
+        ))
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.black },
-  scroll: { flex: 1 },
-  header: { padding: 24, paddingTop: 40 },
-  title: { fontSize: 32, color: Colors.text, fontWeight: 'bold' },
-  highlight: { color: Colors.gold },
-  alertCard: {
-    marginHorizontal: 20,
-    backgroundColor: 'rgba(232,75,75,0.12)',
-    borderColor: 'rgba(232,75,75,0.3)',
-    borderWidth: 1,
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 20,
+  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 6 },
+  muted: { color: Colors.muted, fontSize: 13, lineHeight: 19 },
+  section: { fontSize: 20, color: Colors.text, fontWeight: 'bold', marginTop: 12, marginBottom: 12 },
+  planName: { color: Colors.text, fontSize: 20, fontWeight: 'bold', flex: 1 },
+  planPrice: { color: Colors.gold, fontSize: 28, fontWeight: 'bold', marginBottom: 6 },
+  planGold: { color: Colors.gold, fontWeight: 'bold', fontSize: 16 },
+  amount: { color: Colors.text, fontSize: 16, fontWeight: 'bold', flexShrink: 1 },
+  cardsRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
+  summary: {
+    flex: 1, backgroundColor: Colors.card, borderColor: Colors.border, borderWidth: 1,
+    borderRadius: 20, paddingVertical: 16, paddingHorizontal: 12, alignItems: 'center',
   },
-  alertTitle: { color: Colors.red, fontWeight: 'bold', fontSize: 16 },
-  alertSub: { color: Colors.text, opacity: 0.8, marginTop: 4 },
-  sectionTitle: { fontSize: 20, color: Colors.text, fontWeight: 'bold', marginHorizontal: 24, marginBottom: 16 },
-  planCard: {
-    marginHorizontal: 20,
-    backgroundColor: Colors.card,
-    borderColor: Colors.border,
-    borderWidth: 1,
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 16,
-    position: 'relative',
-  },
-  planName: { fontSize: 18, color: Colors.text, fontWeight: 'bold' },
-  planPrice: { fontSize: 16, color: Colors.gold, marginTop: 4, fontWeight: 'bold' },
-  planMeta: { fontSize: 13, color: Colors.muted, marginTop: 8 },
-  statusBadgeActive: {
-    position: 'absolute', top: 20, right: 20,
-    backgroundColor: 'rgba(75,232,122,0.2)',
-    paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12,
-    borderWidth: 1, borderColor: 'rgba(75,232,122,0.3)',
-  },
-  statusTextActive: { color: Colors.green, fontWeight: 'bold', fontSize: 12 },
-  payBtn: {
-    backgroundColor: Colors.blue,
-    padding: 14, borderRadius: 12, alignItems: 'center', marginTop: 16,
-  },
-  payBtnText: { color: '#fff', fontWeight: 'bold' },
+  summaryValue: { color: Colors.gold, fontSize: 24, fontWeight: 'bold' },
+  summaryLabel: { color: Colors.muted, fontSize: 12, fontWeight: '600', marginTop: 4 },
+  formTitle: { color: Colors.gold, fontSize: 18, fontWeight: 'bold', marginBottom: 14 },
+  chipLabel: { color: Colors.text, fontWeight: 'bold', fontSize: 13, marginBottom: 8 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
+  formActions: { flexDirection: 'row', gap: 10, marginTop: 14, flexWrap: 'wrap' },
 });

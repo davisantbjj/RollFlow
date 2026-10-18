@@ -1,8 +1,12 @@
 import axios from 'axios';
+import { Platform } from 'react-native';
 import { useAuthStore } from '../../store/authStore';
 
-// Base URL from environment or fallback to localhost for development
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3333';
+// Na web, usa o mesmo host da página (localhost no PC); no celular, o IP do PC vindo do env
+const BASE_URL =
+  Platform.OS === 'web' && typeof window !== 'undefined'
+    ? `${window.location.protocol}//${window.location.hostname}:3333`
+    : process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3333';
 
 export const api = axios.create({
   baseURL: BASE_URL,

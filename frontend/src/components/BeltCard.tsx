@@ -32,16 +32,17 @@ const BELT_NAMES: Record<string, string> = {
   VERMELHA: 'Vermelha',
 };
 
-export default function BeltCard() {
+export default function BeltCard({ studentId }: { studentId?: string }) {
   const { user } = useAuthStore();
+  const targetId = studentId || user?.id;
   const [progression, setProgression] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchProgression = async () => {
       try {
-        if (!user?.id) return;
-        const res = await api.get(`/progression/student/${user.id}`);
+        if (!targetId) return;
+        const res = await api.get(`/progression/student/${targetId}`);
         setProgression(res.data);
       } catch (error) {
         console.error('Error fetching progression:', error);
@@ -51,7 +52,7 @@ export default function BeltCard() {
     };
 
     fetchProgression();
-  }, [user?.id]);
+  }, [targetId]);
 
   if (loading) {
     return (

@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, ActivityIndicator, Alert, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { Colors } from '../../theme/colors';
 import { api } from '../services/api';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuthStore } from '../../store/authStore';
+import { notify, apiError } from '../utils/notify';
 
 interface Student {
   id: string;
@@ -36,7 +37,7 @@ export default function Checkin() {
   // Se não for admin, redireciona de volta
   useEffect(() => {
     if (!isAdmin) {
-      Alert.alert('Erro', 'Acesso negado');
+      notify.error('Acesso negado');
       router.back();
     }
   }, [isAdmin, router]);
@@ -53,13 +54,18 @@ export default function Checkin() {
       const attRes = await api.get(`/attendance/class/${classId}`);
       
       // Filter for today only
-      const today = new Date().toISOString().split('T')[0];
-      const todaysAttendances = attRes.data.filter((a: any) => a.date.startsWith(today));
+      const d = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const today = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      const todaysAttendances = attRes.data.filter((a: any) => {
+        const ad = new Date(a.date);
+        return `${ad.getFullYear()}-${pad(ad.getMonth() + 1)}-${pad(ad.getDate())}` === today;
+      });
       
       setAttendances(todaysAttendances);
     } catch (error) {
       console.error('Error fetching checkin data:', error);
-      Alert.alert('Erro', 'Não foi possível carregar os dados da turma');
+      notify.error('Não foi possível carregar os dados da turma');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -77,7 +83,7 @@ export default function Checkin() {
 
   const handleCheckin = async (studentId: string, isBlocked: boolean) => {
     if (isBlocked) {
-      Alert.alert('Bloqueado', 'Este aluno está com pendências e não pode fazer check-in.');
+      notify.error('Este aluno está com pendências e não pode fazer check-in.');
       return;
     }
 
@@ -90,7 +96,7 @@ export default function Checkin() {
       // Refresh just the attendances to be faster, or re-fetch all
       await fetchData();
     } catch (error: any) {
-      Alert.alert('Erro', error.response?.data?.error || 'Erro ao registrar presença');
+      notify.error(apiError(error, 'Erro ao registrar presença'));
     } finally {
       setActionLoading(null);
     }
@@ -109,7 +115,7 @@ export default function Checkin() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} style={styles.backBtn}>
           <Text style={styles.backBtnText}>← Voltar</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Chamada</Text>
