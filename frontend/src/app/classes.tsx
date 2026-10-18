@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '../../theme/colors';
-import { Screen, Header, Loading, ErrorState, Empty, Button, Field, Chip, Badge, cardStyle } from '../components/ui';
+import { CalendarDays, Users, Clock, GraduationCap, ChevronDown, ChevronUp, Plus, X, ClipboardCheck, Pencil, Trash2 } from 'lucide-react-native';
+import { Fonts } from '../../theme/typography';
+import { Text, Screen, Header, Loading, ErrorState, Empty, Button, Field, Chip, Badge, cardStyle } from '../components/ui';
 import { useAuthStore, isManagement, isStaff } from '../../store/authStore';
 import { api } from '../services/api';
 import { notify, confirmAction, apiError } from '../utils/notify';
@@ -66,7 +68,7 @@ export default function Classes() {
     <Screen>
       <Header
         title="Turmas"
-        right={manager ? <Button label={showCreate ? 'Fechar' : '+ Nova'} variant={showCreate ? 'ghost' : 'gold'} onPress={() => setShowCreate(!showCreate)} /> : undefined}
+        right={manager ? <Button label={showCreate ? 'Fechar' : 'Nova turma'} icon={showCreate ? X : Plus} variant={showCreate ? 'ghost' : 'gold'} onPress={() => setShowCreate(!showCreate)} /> : undefined}
       />
       {loading ? (
         <Loading />
@@ -99,7 +101,7 @@ export default function Classes() {
           {error ? (
             <ErrorState message={error} onRetry={load} />
           ) : classes.length === 0 ? (
-            <Empty icon="🥋" title="Nenhuma turma cadastrada" hint={manager ? 'Toque em "+ Nova" para criar a primeira turma.' : undefined} />
+            <Empty icon={CalendarDays} title="Nenhuma turma cadastrada" hint={manager ? 'Toque em "Nova turma" para criar a primeira.' : undefined} />
           ) : (
             classes.map((cls) => (
               <ClassCard
@@ -136,25 +138,26 @@ function ClassCard({ cls, staff, manager, open, onToggle, onChanged }: {
       >
         <View style={styles.head}>
           <View style={styles.timeBox}>
-            <Text style={styles.timeText}>{cls.startTime || '—'}</Text>
+            <Text style={styles.timeText}>{cls.startTime || '--:--'}</Text>
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.name}>{cls.name}</Text>
             {cls.description ? <Text style={styles.desc}>{cls.description}</Text> : null}
           </View>
-          {staff && <Text style={styles.chevron}>{open ? '▲' : '▼'}</Text>}
+          {staff && (open ? <ChevronUp size={20} color={Colors.muted} strokeWidth={2} /> : <ChevronDown size={20} color={Colors.muted} strokeWidth={2} />)}
         </View>
         <View style={styles.badges}>
-          {cls._count ? <Meta text={`👥 ${cls._count.students} ${cls._count.students === 1 ? 'aluno' : 'alunos'}`} /> : null}
-          {cls.dayOfWeek ? <Meta text={`📅 ${cls.dayOfWeek}`} /> : null}
-          {cls.endTime ? <Meta text={`⏰ ${cls.startTime}–${cls.endTime}`} /> : null}
-          {teacherNames ? <Meta text={`🥋 ${teacherNames}`} /> : null}
+          {cls._count ? <Meta icon={Users} text={`${cls._count.students} ${cls._count.students === 1 ? 'aluno' : 'alunos'}`} /> : null}
+          {cls.dayOfWeek ? <Meta icon={CalendarDays} text={cls.dayOfWeek} /> : null}
+          {cls.endTime ? <Meta icon={Clock} mono text={`${cls.startTime}–${cls.endTime}`} /> : null}
+          {teacherNames ? <Meta icon={GraduationCap} text={teacherNames} /> : null}
         </View>
       </TouchableOpacity>
 
       {staff && (
         <Button
           label="Fazer chamada"
+          icon={ClipboardCheck}
           variant="blue"
           style={{ marginTop: 14 }}
           onPress={() => router.push({ pathname: '/checkin' as any, params: { classId: cls.id, className: cls.name } })}
@@ -166,10 +169,11 @@ function ClassCard({ cls, staff, manager, open, onToggle, onChanged }: {
   );
 }
 
-function Meta({ text }: { text: string }) {
+function Meta({ text, icon: Icon, mono }: { text: string; icon: any; mono?: boolean }) {
   return (
     <View style={styles.meta}>
-      <Text style={styles.metaText}>{text}</Text>
+      <Icon size={14} color={Colors.muted} strokeWidth={2} />
+      <Text style={[styles.metaText, mono && { fontFamily: Fonts.mono }]}>{text}</Text>
     </View>
   );
 }
@@ -213,9 +217,10 @@ function ClassDetailPanel({ cls, manager, onChanged }: { cls: ClassItem; manager
     setPicker(kind);
     setPeopleLoading(true);
     try {
-      const res = await api.get('/users', kind === 'student' ? { params: { filterRole: 'ALUNO' } } : undefined);
-      const all: (Person & { role?: string })[] = res.data || [];
-      setPeople(kind === 'teacher' ? all.filter((u) => ['MASTER', 'ADMIN', 'PROFESSOR'].includes(u.role || '')) : all);
+      const res = await api.get('/users', {
+        params: kind === 'student' ? { filterRole: 'ALUNO' } : { filterRole: 'PROFESSOR', includeAdmins: true },
+      });
+      setPeople(res.data || []);
     } catch (err) {
       notify.error(apiError(err, 'Não foi possível carregar a lista.'));
       setPicker(null);
@@ -303,7 +308,7 @@ function ClassDetailPanel({ cls, manager, onChanged }: { cls: ClassItem; manager
 
       <View style={styles.sectionRow}>
         <Text style={styles.sectionTitle}>Professores</Text>
-        {manager && <Chip label={picker === 'teacher' ? 'Fechar' : '+ Vincular'} onPress={() => openPicker('teacher')} />}
+        {manager && <Chip label={picker === 'teacher' ? 'Fechar' : 'Vincular'} onPress={() => openPicker('teacher')} />}
       </View>
       {picker === 'teacher' && (
         <Picker loading={peopleLoading} people={available} emptyText="Nenhum professor disponível para vincular." onPick={addTeacher} />
@@ -318,7 +323,7 @@ function ClassDetailPanel({ cls, manager, onChanged }: { cls: ClassItem; manager
 
       <View style={[styles.sectionRow, { marginTop: 18 }]}>
         <Text style={styles.sectionTitle}>Alunos ({detail.students.length})</Text>
-        {manager && <Chip label={picker === 'student' ? 'Fechar' : '+ Matricular'} onPress={() => openPicker('student')} />}
+        {manager && <Chip label={picker === 'student' ? 'Fechar' : 'Matricular'} onPress={() => openPicker('student')} />}
       </View>
       {picker === 'student' && (
         <Picker loading={peopleLoading} people={available} emptyText="Todos os alunos já estão nesta turma." onPick={enroll} />
@@ -340,8 +345,8 @@ function ClassDetailPanel({ cls, manager, onChanged }: { cls: ClassItem; manager
 
       {manager && !editing && (
         <View style={styles.panelActions}>
-          <Button label="Editar turma" variant="ghost" onPress={() => setEditing(true)} />
-          <Button label="Excluir turma" variant="danger" onPress={deleteClass} loading={busy} />
+          <Button label="Editar turma" icon={Pencil} variant="ghost" onPress={() => setEditing(true)} />
+          <Button label="Excluir turma" icon={Trash2} variant="danger" onPress={deleteClass} loading={busy} />
         </View>
       )}
     </View>
@@ -457,12 +462,12 @@ function ClassForm({ title, submitLabel, initial, onSubmit, onCancel }: {
 const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 12 },
   timeBox: { backgroundColor: Colors.gold, borderRadius: 14, paddingVertical: 8, paddingHorizontal: 12, minWidth: 58, alignItems: 'center' },
-  timeText: { fontSize: 16, color: '#000', fontWeight: 'bold' },
-  name: { fontSize: 18, color: Colors.text, fontWeight: 'bold' },
+  timeText: { fontFamily: Fonts.monoBold, fontSize: 16, color: '#000' },
+  name: { fontSize: 16, color: Colors.text, fontWeight: 'bold' },
   desc: { fontSize: 13, color: Colors.muted, marginTop: 4 },
   chevron: { color: Colors.muted, fontSize: 12 },
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  meta: { backgroundColor: Colors.card2, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
+  meta: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.card2, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4 },
   metaText: { color: Colors.muted, fontSize: 12, fontWeight: '600' },
   panel: { borderTopWidth: 1, borderTopColor: Colors.border, marginTop: 16, paddingTop: 16 },
   sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
@@ -471,12 +476,12 @@ const styles = StyleSheet.create({
   person: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border },
   personName: { color: Colors.text, fontSize: 14, fontWeight: '600' },
   personSub: { color: Colors.muted, fontSize: 12, marginTop: 2 },
-  removeBtn: { paddingHorizontal: 10, paddingVertical: 8, minHeight: 36, justifyContent: 'center' },
+  removeBtn: { paddingHorizontal: 12, paddingVertical: 8, minHeight: 44, justifyContent: 'center' },
   removeText: { color: Colors.red, fontWeight: 'bold', fontSize: 13 },
   panelActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 18 },
   picker: { backgroundColor: Colors.card2, borderRadius: 12, paddingHorizontal: 12, marginBottom: 10 },
   pickerItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, minHeight: 44 },
   addText: { color: Colors.gold, fontWeight: 'bold', fontSize: 13 },
-  formTitle: { color: Colors.gold, fontSize: 18, fontWeight: 'bold', marginBottom: 14 },
+  formTitle: { color: Colors.gold, fontFamily: Fonts.display, fontSize: 24, letterSpacing: 1, marginBottom: 16 },
   twoCols: { flexDirection: 'row', gap: 12 },
 });

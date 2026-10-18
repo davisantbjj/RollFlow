@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, SafeAreaView } from 'react-native';
+import { TriangleAlert } from 'lucide-react-native';
+import { Text, Field, Button } from '../components/ui';
+import { Fonts } from '../../theme/typography';
 import { Colors } from '../../theme/colors';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '../../store/authStore';
@@ -37,55 +40,35 @@ export default function Login() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.formContainer}>
-        <Text style={styles.title}>Roll<Text style={styles.highlight}>Flow</Text></Text>
-        <Text style={styles.subtitle}>Gestão de Excelência para o Tatame</Text>
+        <Text style={styles.title} accessibilityRole="header">Roll<Text style={styles.highlight}>Flow</Text></Text>
+        <Text style={styles.subtitle}>Gestão de excelência para o tatame</Text>
 
         {error ? (
-          <View style={styles.errorBox}>
+          <View style={styles.errorBox} accessibilityRole="alert">
+            <TriangleAlert size={16} color={Colors.red} strokeWidth={2} />
             <Text style={styles.errorText}>{error}</Text>
           </View>
         ) : null}
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>E-mail</Text>
-          <TextInput 
-            style={styles.input} 
-            placeholder="Digite seu e-mail"
-            placeholderTextColor={Colors.muted}
-            value={email}
-            onChangeText={(text) => { setEmail(text); setError(''); }}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            editable={!isLoading}
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Senha</Text>
-          <TextInput 
-            style={styles.input} 
-            placeholder="Digite sua senha"
-            placeholderTextColor={Colors.muted}
-            secureTextEntry
-            value={password}
-            onChangeText={(text) => { setPassword(text); setError(''); }}
-            editable={!isLoading}
-            onSubmitEditing={handleLogin}
-          />
-        </View>
-
-        <TouchableOpacity 
-          style={[styles.loginBtn, isLoading && styles.loginBtnDisabled]} 
-          onPress={handleLogin}
-          disabled={isLoading}
-          activeOpacity={0.8}
-        >
-          {isLoading ? (
-            <ActivityIndicator color={Colors.black} size="small" />
-          ) : (
-            <Text style={styles.loginBtnText}>Entrar no App</Text>
-          )}
-        </TouchableOpacity>
+        <Field
+          label="E-mail"
+          placeholder="voce@academia.com"
+          value={email}
+          onChangeText={(text) => { setEmail(text); setError(''); }}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          editable={!isLoading}
+        />
+        <Field
+          label="Senha"
+          placeholder="Digite sua senha"
+          secureTextEntry
+          value={password}
+          onChangeText={(text) => { setPassword(text); setError(''); }}
+          editable={!isLoading}
+          onSubmitEditing={handleLogin}
+        />
+        <Button label="Entrar" onPress={handleLogin} loading={isLoading} style={{ marginTop: 8 }} />
       </View>
     </SafeAreaView>
   );
@@ -93,39 +76,14 @@ export default function Login() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.black, justifyContent: 'center' },
-  formContainer: { paddingHorizontal: 24, paddingBottom: 40 },
-  title: { fontSize: 48, color: Colors.text, fontWeight: 'bold', textAlign: 'center' },
+  formContainer: { paddingHorizontal: 24, paddingBottom: 40, width: '100%', maxWidth: 440, alignSelf: 'center' },
+  title: { fontFamily: Fonts.display, fontSize: 72, letterSpacing: 2, color: Colors.text, textAlign: 'center' },
   highlight: { color: Colors.gold },
-  subtitle: { color: Colors.muted, textAlign: 'center', marginBottom: 40, marginTop: 4 },
+  subtitle: { color: Colors.muted, fontSize: 14, textAlign: 'center', marginBottom: 40 },
   errorBox: {
-    backgroundColor: 'rgba(232,75,75,0.12)',
-    borderColor: 'rgba(232,75,75,0.3)',
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 20,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: 'rgba(232,75,75,0.12)', borderColor: 'rgba(232,75,75,0.3)', borderWidth: 1,
+    borderRadius: 12, padding: 12, marginBottom: 20,
   },
-  errorText: { color: Colors.red, fontSize: 14, textAlign: 'center' },
-  inputGroup: { marginBottom: 20 },
-  label: { color: Colors.text, marginBottom: 8, fontWeight: 'bold' },
-  input: {
-    backgroundColor: Colors.card,
-    borderColor: Colors.border,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 16,
-    color: Colors.text,
-    fontSize: 16,
-  },
-  loginBtn: {
-    backgroundColor: Colors.gold,
-    paddingVertical: 18,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  loginBtnDisabled: {
-    opacity: 0.7,
-  },
-  loginBtnText: { color: Colors.black, fontSize: 16, fontWeight: 'bold' },
+  errorText: { color: Colors.red, fontSize: 14, flex: 1 },
 });

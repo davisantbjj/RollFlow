@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ScrollView } from 'react-native';
+import { ClipboardCheck, Clock, Star } from 'lucide-react-native';
+import { Fonts, Type } from '../../theme/typography';
 import { Colors } from '../../theme/colors';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../services/api';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ErrorState } from '../components/ui';
+import { useLocalSearchParams } from 'expo-router';
+import { Text, Screen, Header, Loading, Empty, ErrorState } from '../components/ui';
 import { apiError } from '../utils/notify';
 import BeltCard from '../components/BeltCard';
 
@@ -13,7 +15,6 @@ export default function Progression() {
   const params = useLocalSearchParams<{ studentId?: string; studentName?: string }>();
   const studentId = (params.studentId as string) || user?.id;
   const isOther = !!params.studentId && params.studentId !== user?.id;
-  const router = useRouter();
   const [progression, setProgression] = useState<any>(null);
   const [evaluations, setEvaluations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,70 +44,34 @@ export default function Progression() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.gold} />
-        </View>
-      </SafeAreaView>
+      <Screen>
+        <Header title="Evolução" back />
+        <Loading />
+      </Screen>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>← Voltar</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Evolução</Text>
-        {isOther && params.studentName ? <Text style={styles.subtitle}>{params.studentName}</Text> : null}
-      </View>
+    <Screen>
+      <Header title="Evolução" subtitle={isOther && params.studentName ? (params.studentName as string) : undefined} back />
 
-      <ScrollView style={styles.scroll}>
+      <ScrollView style={styles.scroll} contentContainerStyle={{ paddingBottom: 32 }}>
         {error ? <ErrorState message={error} onRetry={fetchData} /> : null}
         {!error && <BeltCard studentId={studentId} />}
 
         {progression && progression.stats && progression.rule && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Métricas de Progresso</Text>
-            
-            <View style={styles.metricCard}>
-              <View style={styles.metricHeader}>
-                <Text style={styles.metricTitle}>🥋 Assiduidade</Text>
-                <Text style={styles.metricValue}>{progression.stats.attendances} / {progression.rule.minAttendanceCount} aulas</Text>
-              </View>
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: `${progression.progress.attendance}%` }]} />
-              </View>
-            </View>
-
-            <View style={styles.metricCard}>
-              <View style={styles.metricHeader}>
-                <Text style={styles.metricTitle}>⏱️ Tempo de Faixa</Text>
-                <Text style={styles.metricValue}>{progression.stats.elapsedMonths} / {progression.rule.minMonths} meses</Text>
-              </View>
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: `${progression.progress.time}%` }]} />
-              </View>
-            </View>
-
-            <View style={styles.metricCard}>
-              <View style={styles.metricHeader}>
-                <Text style={styles.metricTitle}>⭐ Avaliação Técnica</Text>
-                <Text style={styles.metricValue}>{progression.stats.avgScore} / {progression.rule.minEvaluationScore} (Média)</Text>
-              </View>
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: `${progression.progress.evaluation}%` }]} />
-              </View>
-            </View>
+            <Text style={styles.sectionTitle}>Métricas de progresso</Text>
+            <Metric icon={ClipboardCheck} title="Assiduidade" value={`${progression.stats.attendances} / ${progression.rule.minAttendanceCount} aulas`} pct={progression.progress.attendance} />
+            <Metric icon={Clock} title="Tempo de faixa" value={`${progression.stats.elapsedMonths} / ${progression.rule.minMonths} meses`} pct={progression.progress.time} />
+            <Metric icon={Star} title="Avaliação técnica" value={`${progression.stats.avgScore} / ${progression.rule.minEvaluationScore} (média)`} pct={progression.progress.evaluation} />
           </View>
         )}
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Avaliações Recentes</Text>
+          <Text style={styles.sectionTitle}>Avaliações recentes</Text>
           {evaluations.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>Nenhuma avaliação registrada ainda.</Text>
-            </View>
+            <Empty icon={Star} title="Nenhuma avaliação registrada ainda" />
           ) : (
             evaluations.map(ev => {
               const date = new Date(ev.createdAt).toLocaleDateString('pt-BR');
@@ -116,11 +81,9 @@ export default function Progression() {
                     <Text style={styles.evalAuthor}>Por {ev.evaluator?.name || 'Professor'}</Text>
                     <Text style={styles.evalDate}>{date}</Text>
                   </View>
-                  <View style={styles.evalScores}>
-                    <Text style={styles.evalScore}>Técnica: <Text style={styles.goldText}>{ev.technique}</Text></Text>
-                    <Text style={styles.evalScore}>Disciplina: <Text style={styles.goldText}>{ev.discipline}</Text></Text>
-                    <Text style={styles.evalScore}>Evolução: <Text style={styles.goldText}>{ev.evolution}</Text></Text>
-                  </View>
+                  <Score label="Técnica" value={ev.technique} />
+                  <Score label="Disciplina" value={ev.discipline} />
+                  <Score label="Evolução" value={ev.evolution} />
                   {ev.notes ? <Text style={styles.evalNotes}>"{ev.notes}"</Text> : null}
                 </View>
               );
@@ -128,79 +91,60 @@ export default function Progression() {
           )}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
+  );
+}
+
+function Metric({ icon: Icon, title, value, pct }: { icon: any; title: string; value: string; pct: number }) {
+  return (
+    <View style={styles.metricCard}>
+      <View style={styles.metricHeader}>
+        <View style={styles.metricTitleRow}>
+          <Icon size={16} color={Colors.gold} strokeWidth={2} />
+          <Text style={styles.metricTitle}>{title}</Text>
+        </View>
+        <Text style={styles.metricValue}>{value}</Text>
+      </View>
+      <View style={styles.progressBar}>
+        <View style={[styles.progressFill, { width: `${Math.max(0, Math.min(100, pct || 0))}%` }]} />
+      </View>
+    </View>
+  );
+}
+
+/** Nota de 0 a 5 em estrelas, com o número em mono. */
+function Score({ label, value }: { label: string; value: number }) {
+  const n = Math.round(Number(value) || 0);
+  return (
+    <View style={styles.scoreRow} accessible accessibilityLabel={`${label}: ${value} de 5`}>
+      <Text style={styles.scoreLabel}>{label}</Text>
+      <View style={{ flexDirection: 'row', gap: 2 }}>
+        {[1, 2, 3, 4, 5].map((i) => (
+          <Star key={i} size={14} color={i <= n ? Colors.gold : Colors.border} fill={i <= n ? Colors.gold : 'transparent'} strokeWidth={2} />
+        ))}
+      </View>
+      <Text style={styles.scoreNum}>{value}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.black },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { padding: 24, paddingTop: 40, paddingBottom: 16 },
-  backBtn: { marginBottom: 16 },
-  backBtnText: { color: Colors.gold, fontSize: 16, fontWeight: 'bold' },
-  title: { fontSize: 32, color: Colors.text, fontWeight: 'bold' },
-  subtitle: { fontSize: 16, color: Colors.muted, marginTop: 4 },
   scroll: { flex: 1 },
-  
-  section: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    color: Colors.text,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  metricCard: {
-    backgroundColor: Colors.card,
-    borderColor: Colors.border,
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-  },
-  metricHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  metricTitle: { color: Colors.text, fontSize: 15, fontWeight: 'bold' },
-  metricValue: { color: Colors.muted, fontSize: 14 },
-  progressBar: {
-    height: 6,
-    backgroundColor: Colors.border,
-    borderRadius: 99,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: Colors.gold,
-    borderRadius: 99,
-  },
-
-  emptyCard: {
-    backgroundColor: Colors.card,
-    borderColor: Colors.border,
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 24,
-    alignItems: 'center',
-  },
-  emptyText: { color: Colors.muted, fontSize: 14 },
-
-  evalCard: {
-    backgroundColor: Colors.card,
-    borderColor: Colors.border,
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-  },
+  section: { paddingHorizontal: 20, marginBottom: 24 },
+  sectionTitle: { ...Type.section, color: Colors.text, marginBottom: 12 },
+  metricCard: { backgroundColor: Colors.card, borderColor: Colors.border, borderWidth: 1, borderRadius: 20, padding: 16, marginBottom: 12 },
+  metricHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 8 },
+  metricTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  metricTitle: { color: Colors.text, fontSize: 14, fontWeight: 'bold' },
+  metricValue: { color: Colors.muted, fontFamily: Fonts.mono, fontSize: 12 },
+  progressBar: { height: 6, backgroundColor: Colors.border, borderRadius: 999, overflow: 'hidden' },
+  progressFill: { height: '100%', backgroundColor: Colors.gold, borderRadius: 999 },
+  evalCard: { backgroundColor: Colors.card, borderColor: Colors.border, borderWidth: 1, borderRadius: 20, padding: 16, marginBottom: 12 },
   evalHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  evalAuthor: { color: Colors.text, fontWeight: 'bold', fontSize: 15 },
-  evalDate: { color: Colors.muted, fontSize: 13 },
-  evalScores: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  evalScore: { color: Colors.muted, fontSize: 13 },
-  goldText: { color: Colors.gold, fontWeight: 'bold' },
-  evalNotes: { color: Colors.text, fontStyle: 'italic', fontSize: 14, marginTop: 4 },
+  evalAuthor: { color: Colors.text, fontWeight: 'bold', fontSize: 14 },
+  evalDate: { color: Colors.muted, fontFamily: Fonts.mono, fontSize: 12 },
+  scoreRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 },
+  scoreLabel: { color: Colors.muted, fontSize: 12, width: 80 },
+  scoreNum: { color: Colors.gold, fontFamily: Fonts.monoBold, fontSize: 12 },
+  evalNotes: { color: Colors.text, fontStyle: 'italic', fontSize: 14, marginTop: 8 },
 });

@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, StyleSheet, ScrollView, TextInput, TouchableOpacity, RefreshControl } from 'react-native';
 import { Colors } from '../../theme/colors';
-import { Screen, Header, Loading, ErrorState, Empty, Button, Badge, cardStyle } from '../components/ui';
+import { Heart, MessageCircle, Pin, PinOff, Trash2, Newspaper, Send } from 'lucide-react-native';
+import { Fonts } from '../../theme/typography';
+import { Text, Avatar, Screen, Header, Loading, ErrorState, Empty, Button, Badge, cardStyle } from '../components/ui';
 import { useAuthStore, isManagement, isStaff } from '../../store/authStore';
 import { api } from '../services/api';
 import { notify, confirmAction, apiError } from '../utils/notify';
-import { timeAgo } from '../utils/format';
+import { timeAgo, roleLabel } from '../utils/format';
 
 interface Post {
   id: string;
@@ -25,10 +27,6 @@ interface Comment {
   createdAt: string;
   author: { id: string; name: string };
 }
-
-const ROLE_LABEL: Record<string, string> = {
-  MASTER: 'Mestre', ADMIN: 'Administração', PROFESSOR: 'Professor', ALUNO: 'Aluno', RESPONSAVEL: 'Responsável',
-};
 
 export default function Feed() {
   const { user } = useAuthStore();
@@ -147,7 +145,7 @@ export default function Feed() {
                 value={draft}
                 onChangeText={setDraft}
               />
-              <Button label="Publicar" onPress={publish} loading={publishing} style={{ alignSelf: 'flex-end', marginTop: 12 }} />
+              <Button label="Publicar" icon={Send} onPress={publish} loading={publishing} style={{ alignSelf: 'flex-end', marginTop: 12 }} />
             </View>
           )}
 
@@ -155,7 +153,7 @@ export default function Feed() {
             <ErrorState message={error} onRetry={fetchPosts} />
           ) : posts.length === 0 ? (
             <Empty
-              icon="📰"
+              icon={Newspaper}
               title="Nenhuma publicação ainda"
               hint={canPost ? 'Use o campo acima para publicar a primeira.' : 'Os avisos da academia aparecem aqui.'}
             />
@@ -232,16 +230,14 @@ function PostCard({ post, canPin, canDelete, onLike, onPin, onDelete, onCommentC
   return (
     <View style={[cardStyle, post.isPinned && { borderColor: Colors.gold }]}>
       <View style={styles.postHead}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{post.author.name.substring(0, 2).toUpperCase()}</Text>
-        </View>
+        <Avatar initials={post.author.name.substring(0, 2).toUpperCase()} />
         <View style={{ flex: 1 }}>
           <Text style={styles.author}>{post.author.name}</Text>
           <Text style={styles.time}>
-            {ROLE_LABEL[post.author.role] || post.author.role} · {timeAgo(post.createdAt)}
+            {roleLabel(post.author.role)} · {timeAgo(post.createdAt)}
           </Text>
         </View>
-        {post.isPinned && <Badge label="Fixado" color={Colors.gold} />}
+        {post.isPinned && <Badge label="Fixado" color={Colors.gold} icon={Pin} />}
       </View>
 
       <Text style={styles.content}>{post.content}</Text>
@@ -253,22 +249,22 @@ function PostCard({ post, canPin, canDelete, onLike, onPin, onDelete, onCommentC
           accessibilityRole="button"
           accessibilityLabel={post.likedByMe ? 'Remover curtida' : 'Curtir'}
         >
-          <Text style={[styles.actionText, post.likedByMe && { color: Colors.red }]}>
-            {post.likedByMe ? '♥' : '♡'} {post.likesCount}
-          </Text>
+          <Heart size={20} color={post.likedByMe ? Colors.red : Colors.muted} fill={post.likedByMe ? Colors.red : 'transparent'} strokeWidth={2} />
+          <Text style={[styles.actionText, post.likedByMe && { color: Colors.red }]}>{post.likesCount}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={toggle} style={styles.action} accessibilityRole="button" accessibilityLabel="Comentários">
-          <Text style={[styles.actionText, open && { color: Colors.gold }]}>💬 {post.commentsCount}</Text>
+          <MessageCircle size={20} color={open ? Colors.gold : Colors.muted} strokeWidth={2} />
+          <Text style={[styles.actionText, open && { color: Colors.gold }]}>{post.commentsCount}</Text>
         </TouchableOpacity>
         <View style={{ flex: 1 }} />
         {canPin && (
-          <TouchableOpacity onPress={onPin} style={styles.action} accessibilityRole="button">
-            <Text style={styles.actionText}>{post.isPinned ? 'Desafixar' : 'Fixar'}</Text>
+          <TouchableOpacity onPress={onPin} style={styles.action} accessibilityRole="button" accessibilityLabel={post.isPinned ? 'Desafixar publicação' : 'Fixar publicação'}>
+            {post.isPinned ? <PinOff size={20} color={Colors.gold} strokeWidth={2} /> : <Pin size={20} color={Colors.muted} strokeWidth={2} />}
           </TouchableOpacity>
         )}
         {canDelete && (
-          <TouchableOpacity onPress={onDelete} style={styles.action} accessibilityRole="button">
-            <Text style={[styles.actionText, { color: Colors.red }]}>Excluir</Text>
+          <TouchableOpacity onPress={onDelete} style={styles.action} accessibilityRole="button" accessibilityLabel="Excluir publicação">
+            <Trash2 size={20} color={Colors.red} strokeWidth={2} />
           </TouchableOpacity>
         )}
       </View>
@@ -317,7 +313,7 @@ const styles = StyleSheet.create({
   composer: { ...cardStyle, borderColor: Colors.gold },
   input: {
     backgroundColor: Colors.card2, borderColor: Colors.border, borderWidth: 1, borderRadius: 12,
-    padding: 12, color: Colors.text, fontSize: 15, minHeight: 60, textAlignVertical: 'top',
+    padding: 12, color: Colors.text, fontSize: 16, fontFamily: Fonts.regular, minHeight: 60, textAlignVertical: 'top',
   },
   postHead: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
   avatar: {
@@ -326,14 +322,14 @@ const styles = StyleSheet.create({
   },
   avatarText: { color: Colors.gold, fontWeight: 'bold', fontSize: 13 },
   author: { color: Colors.text, fontWeight: 'bold', fontSize: 15 },
-  time: { color: Colors.muted, fontSize: 12, fontWeight: '400' },
+  time: { color: Colors.muted, fontSize: 12, fontFamily: Fonts.mono },
   content: { color: Colors.text, fontSize: 15, lineHeight: 22 },
   actions: {
     flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 14,
     borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 6,
   },
-  action: { paddingVertical: 8, paddingHorizontal: 8, minHeight: 40, justifyContent: 'center' },
-  actionText: { color: Colors.muted, fontWeight: '600', fontSize: 13 },
+  action: { paddingVertical: 8, paddingHorizontal: 8, minHeight: 44, minWidth: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  actionText: { color: Colors.muted, fontFamily: Fonts.mono, fontSize: 12 },
   commentsBox: { marginTop: 8, gap: 10 },
   muted: { color: Colors.muted, fontSize: 13 },
   comment: { backgroundColor: Colors.card2, borderRadius: 12, padding: 12 },

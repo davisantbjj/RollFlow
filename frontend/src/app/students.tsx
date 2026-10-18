@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, StyleSheet, ScrollView, TextInput, TouchableOpacity, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '../../theme/colors';
-import { Screen, Header, Loading, ErrorState, Empty, Button, Field, Badge, cardStyle } from '../components/ui';
+import { Plus, X, Search, Lock, Users } from 'lucide-react-native';
+import { Fonts } from '../../theme/typography';
+import { Text, ListRow, BeltStrip, Screen, Header, Loading, ErrorState, Empty, Button, Field, Badge, Chip, cardStyle } from '../components/ui';
 import { useAuthStore, isManagement } from '../../store/authStore';
 import { api } from '../services/api';
 import { notify, apiError } from '../utils/notify';
-import { beltName } from '../utils/format';
+import { beltName, roleLabel } from '../utils/format';
 
 interface Student {
   id: string;
@@ -19,6 +21,7 @@ interface Student {
 }
 
 const EMPTY = { name: '', email: '', password: '', phone: '' };
+type NewRole = 'ALUNO' | 'PROFESSOR' | 'RESPONSAVEL' | 'ADMIN';
 
 export default function Students() {
   const { user } = useAuthStore();
@@ -34,6 +37,9 @@ export default function Students() {
   const [form, setForm] = useState(EMPTY);
   const [errors, setErrors] = useState<Partial<typeof EMPTY>>({});
   const [saving, setSaving] = useState(false);
+  const [newRole, setNewRole] = useState<NewRole>('ALUNO');
+  const roleOptions: NewRole[] = user?.role === 'ADMIN' ? ['ALUNO', 'PROFESSOR', 'RESPONSAVEL', 'ADMIN'] : ['ALUNO', 'PROFESSOR', 'RESPONSAVEL'];
+  const who = roleLabel(newRole).toLowerCase();
   const searchRef = useRef(search);
   searchRef.current = search;
 
@@ -71,15 +77,16 @@ export default function Students() {
         name: form.name.trim(),
         email: form.email.trim(),
         password: form.password,
-        role: 'ALUNO',
+        role: newRole,
         phone: form.phone.trim() || undefined,
       });
-      notify.success('Aluno cadastrado.');
+      notify.success(`${roleLabel(newRole)} cadastrado.`);
+      setNewRole('ALUNO');
       setForm(EMPTY);
       setShowCreate(false);
       load(search);
     } catch (err) {
-      notify.error(apiError(err, 'Não foi possível cadastrar o aluno.'));
+      notify.error(apiError(err, `Não foi possível cadastrar (${who}).`));
     } finally {
       setSaving(false);
     }
@@ -89,7 +96,7 @@ export default function Students() {
     <Screen>
       <Header
         title="Alunos"
-        right={manager ? <Button label={showCreate ? 'Fechar' : '+ Novo'} onPress={() => setShowCreate(!showCreate)} variant={showCreate ? 'ghost' : 'gold'} /> : undefined}
+        right={manager ? <Button label={showCreate ? 'Fechar' : 'Novo'} icon={showCreate ? X : Plus} onPress={() => setShowCreate(!showCreate)} variant={showCreate ? 'ghost' : 'gold'} /> : undefined}
       />
       <ScrollView
         style={{ flex: 1 }}
@@ -101,15 +108,23 @@ export default function Students() {
       >
         {showCreate && (
           <View style={[cardStyle, { borderColor: Colors.gold }]}>
-            <Text style={styles.formTitle}>Novo aluno</Text>
+            <Text style={styles.formTitle}>Novo cadastro</Text>
+            <Text style={styles.roleLabel}>Tipo de usuário</Text>
+            <View style={styles.roleRow}>
+              {roleOptions.map((r) => (
+                <Chip key={r} label={r === 'ADMIN' ? 'Dono/sócio' : roleLabel(r)} active={newRole === r} onPress={() => setNewRole(r)} />
+              ))}
+            </View>
             <Field label="Nome completo" value={form.name} onChangeText={(t) => setForm({ ...form, name: t })} error={errors.name} />
             <Field label="E-mail" value={form.email} onChangeText={(t) => setForm({ ...form, email: t })} error={errors.email} autoCapitalize="none" keyboardType="email-address" />
             <Field label="Senha inicial" value={form.password} onChangeText={(t) => setForm({ ...form, password: t })} error={errors.password} secureTextEntry placeholder="Mínimo 6 caracteres" />
             <Field label="Telefone (opcional)" value={form.phone} onChangeText={(t) => setForm({ ...form, phone: t })} keyboardType="phone-pad" />
-            <Button label="Cadastrar aluno" onPress={create} loading={saving} />
+            <Button label={`Cadastrar ${who}`} onPress={create} loading={saving} />
           </View>
         )}
 
+        <View style={styles.searchWrap}>
+        <Search size={20} color={Colors.muted} strokeWidth={2} />
         <TextInput
           style={styles.search}
           placeholder="Buscar por nome ou e-mail"
@@ -120,6 +135,7 @@ export default function Students() {
           autoCapitalize="none"
           returnKeyType="search"
         />
+        </View>
 
         {loading ? (
           <View style={{ paddingTop: 40 }}><Loading /></View>
@@ -127,31 +143,21 @@ export default function Students() {
           <ErrorState message={error} onRetry={() => load(search)} />
         ) : students.length === 0 ? (
           <Empty
-            icon="👥"
+            icon={Users}
             title={search ? 'Nenhum aluno encontrado' : 'Nenhum aluno cadastrado'}
-            hint={search ? 'Tente outro nome ou e-mail.' : manager ? 'Use "+ Novo" para cadastrar o primeiro.' : undefined}
+            hint={search ? 'Tente outro nome ou e-mail.' : manager ? 'Use "Novo" para cadastrar o primeiro.' : undefined}
           />
         ) : (
           students.map((s) => (
-            <TouchableOpacity
+            <ListRow
               key={s.id}
-              activeOpacity={0.75}
-              style={[cardStyle, styles.row, s.isBlocked && { borderColor: 'rgba(232,75,75,0.4)' }]}
-              accessibilityRole="button"
+              title={s.name}
+              subtitle={`Faixa ${beltName(s.beltColor)} · ${s.beltDegree || 0}º grau`}
+              accent={s.isBlocked ? 'rgba(232,75,75,0.4)' : undefined}
               accessibilityLabel={`Abrir ${s.name}`}
+              right={s.isBlocked ? <Badge label="Bloqueado" color={Colors.red} icon={Lock} /> : <BeltStrip belt={s.beltColor} degree={s.beltDegree || 0} width={32} />}
               onPress={() => router.push({ pathname: '/student/[id]' as any, params: { id: s.id } })}
-            >
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{s.name.substring(0, 2).toUpperCase()}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.name} numberOfLines={1}>{s.name}</Text>
-                <Text style={styles.meta}>
-                  Faixa {beltName(s.beltColor)} · {s.beltDegree || 0}º grau
-                </Text>
-              </View>
-              {s.isBlocked && <Badge label="Bloqueado" color={Colors.red} />}
-            </TouchableOpacity>
+            />
           ))
         )}
       </ScrollView>
@@ -160,11 +166,11 @@ export default function Students() {
 }
 
 const styles = StyleSheet.create({
-  formTitle: { color: Colors.gold, fontSize: 18, fontWeight: 'bold', marginBottom: 14 },
-  search: {
-    backgroundColor: Colors.card, borderColor: Colors.border, borderWidth: 1, borderRadius: 14,
-    padding: 14, color: Colors.text, fontSize: 15, marginBottom: 16,
-  },
+  formTitle: { color: Colors.gold, fontFamily: Fonts.display, fontSize: 24, letterSpacing: 1, marginBottom: 16 },
+  roleLabel: { color: Colors.muted, fontSize: 13, fontWeight: '600', marginBottom: 8 },
+  roleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
+  searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Colors.card, borderColor: Colors.border, borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, marginBottom: 16, minHeight: 48 },
+  search: { flex: 1, color: Colors.text, fontSize: 16, fontFamily: Fonts.regular, paddingVertical: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   avatar: {
     width: 46, height: 46, borderRadius: 23, backgroundColor: Colors.card2,

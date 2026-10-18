@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Colors } from '../../../theme/colors';
 import BeltCard from '../../components/BeltCard';
-import { Screen, Header, Loading, ErrorState, Button, Field, Chip, Badge, cardStyle } from '../../components/ui';
+import { Award, Star, TrendingUp, Lock, LockOpen, CircleCheck, TriangleAlert } from 'lucide-react-native';
+import { Fonts, Type } from '../../../theme/typography';
+import { Text, Screen, Header, Loading, ErrorState, Button, Field, Chip, Badge, cardStyle } from '../../components/ui';
 import { useAuthStore, isManagement } from '../../../store/authStore';
 import { api } from '../../services/api';
 import { notify, confirmAction, apiError } from '../../utils/notify';
@@ -167,9 +169,9 @@ export default function StudentDetailScreen() {
 
         <View style={styles.body}>
           <View style={styles.actionsRow}>
-            <Button label="Ver evolução" variant="ghost" onPress={() => router.push({ pathname: '/progression' as any, params: { studentId: student.id, studentName: student.name } })} />
-            <Button label="Avaliar" variant="blue" onPress={() => { setShowEval(!showEval); setShowPromote(false); }} />
-            <Button label="Promover" onPress={() => { setShowPromote(!showPromote); setShowEval(false); }} />
+            <Button label="Ver evolução" icon={Award} variant="ghost" onPress={() => router.push({ pathname: '/progression' as any, params: { studentId: student.id, studentName: student.name } })} />
+            <Button label="Avaliar" icon={Star} variant="blue" onPress={() => { setShowEval(!showEval); setShowPromote(false); }} />
+            <Button label="Promover" icon={TrendingUp} onPress={() => { setShowPromote(!showPromote); setShowEval(false); }} />
           </View>
 
           {showEval && (
@@ -218,9 +220,10 @@ export default function StudentDetailScreen() {
                 <Badge
                   label={sub.status === 'ACTIVE' ? 'Em dia' : sub.status === 'OVERDUE' ? 'Em atraso' : sub.status}
                   color={sub.status === 'ACTIVE' ? Colors.green : Colors.red}
+                  icon={sub.status === 'ACTIVE' ? CircleCheck : TriangleAlert}
                 />
               </View>
-              <Text style={styles.muted}>
+              <Text style={[styles.muted, styles.mono]}>
                 {money(sub.plan.price)} · {(INTERVALS[sub.plan.interval] || sub.plan.interval).toLowerCase()} · vence em {dateBR(sub.dueDate)}
               </Text>
             </View>
@@ -233,6 +236,7 @@ export default function StudentDetailScreen() {
           {manager && (
             <Button
               label={student.isBlocked ? 'Desbloquear aluno' : 'Bloquear aluno'}
+              icon={student.isBlocked ? LockOpen : Lock}
               variant={student.isBlocked ? 'green' : 'danger'}
               loading={blocking}
               onPress={toggleBlock}
@@ -270,15 +274,16 @@ function Info({ label, value, last }: { label: string; value: string; last?: boo
 const styles = StyleSheet.create({
   body: { paddingHorizontal: 20 },
   actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
-  formTitle: { color: Colors.gold, fontSize: 18, fontWeight: 'bold', marginBottom: 14 },
+  formTitle: { color: Colors.gold, fontFamily: Fonts.display, fontSize: 24, letterSpacing: 1, marginBottom: 16 },
   chipLabel: { color: Colors.text, fontWeight: 'bold', fontSize: 13, marginBottom: 8 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  section: { color: Colors.text, fontSize: 20, fontWeight: 'bold', marginTop: 12, marginBottom: 12 },
+  section: { ...Type.section, color: Colors.text, marginTop: 12, marginBottom: 12 },
   infoCard: { backgroundColor: Colors.card, borderColor: Colors.border, borderWidth: 1, borderRadius: 16, marginBottom: 8 },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 16, padding: 16 },
   infoDivider: { borderBottomWidth: 1, borderBottomColor: Colors.border },
-  infoValue: { color: Colors.text, fontWeight: '600', fontSize: 14, flexShrink: 1 },
+  infoValue: { color: Colors.text, fontFamily: Fonts.mono, fontSize: 13, flexShrink: 1 },
   muted: { color: Colors.muted, fontSize: 14, lineHeight: 20 },
+  mono: { fontFamily: Fonts.mono, fontSize: 12 },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 6 },
   planName: { color: Colors.text, fontSize: 17, fontWeight: 'bold', flex: 1 },
 });

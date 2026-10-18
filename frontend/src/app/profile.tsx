@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, ScrollView } from 'react-native';
+import { LogOut } from 'lucide-react-native';
+import { Type, Fonts } from '../../theme/typography';
 import { Colors } from '../../theme/colors';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../services/api';
-import { ErrorState } from '../components/ui';
+import { Text, Screen, Header, Loading, Avatar, BeltStrip, Button, ErrorState } from '../components/ui';
 import { confirmAction, apiError } from '../utils/notify';
+import { roleLabel } from '../utils/format';
 
 interface UserProfile {
   id: string;
@@ -50,180 +53,69 @@ export default function Profile() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.gold} />
-        </View>
-      </SafeAreaView>
+      <Screen>
+        <Header title="Perfil" />
+        <Loading />
+      </Screen>
     );
   }
 
-  const roleMap: Record<string, string> = {
-    MASTER: 'Dono da Franquia',
-    ADMIN: 'Administrador',
-    PROFESSOR: 'Professor',
-    ALUNO: 'Aluno',
-    RESPONSAVEL: 'Responsável',
-  };
-
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Meu Perfil</Text>
-      </View>
+    <Screen>
+      <Header title="Perfil" />
 
-      <ScrollView style={styles.scroll}>
+      <ScrollView style={styles.scroll} contentContainerStyle={{ paddingBottom: 32 }}>
         {error ? <ErrorState message={error} /> : null}
         <View style={styles.avatarSection}>
-          <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarInitials}>
-              {profile?.name?.substring(0, 2).toUpperCase() || 'RF'}
-            </Text>
-          </View>
+          <Avatar initials={profile?.name?.substring(0, 2).toUpperCase() || 'RF'} size={96} />
           <Text style={styles.name}>{profile?.name}</Text>
-          <Text style={styles.roleText}>{profile?.role ? roleMap[profile.role] : ''}</Text>
+          <Text style={styles.roleText}>{roleLabel(profile?.role)}</Text>
         </View>
 
-        <View style={styles.infoSection}>
-          <Text style={styles.sectionTitle}>Informações Pessoais</Text>
-          
-          <View style={styles.infoCard}>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>E-mail</Text>
-              <Text style={styles.infoValue}>{profile?.email}</Text>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Telefone</Text>
-              <Text style={styles.infoValue}>{profile?.phone || 'Não informado'}</Text>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Academia</Text>
-              <Text style={styles.infoValue}>{profile?.academy?.name || 'Não associado'}</Text>
-            </View>
-          </View>
+        <Text style={styles.sectionTitle}>Informações pessoais</Text>
+        <View style={styles.infoCard}>
+          <Info label="E-mail" value={profile?.email} />
+          <Info label="Telefone" value={profile?.phone || 'Não informado'} mono />
+          <Info label="Academia" value={profile?.academy?.name || 'Não associado'} last />
         </View>
 
         {profile?.role === 'ALUNO' && (
-          <View style={styles.infoSection}>
+          <>
             <Text style={styles.sectionTitle}>Graduação</Text>
             <View style={styles.infoCard}>
-              <View style={styles.infoRow}>
+              <View style={[styles.infoRow, styles.divider]}>
                 <Text style={styles.infoLabel}>Faixa</Text>
-                <Text style={styles.infoValue}>{profile?.beltColor || 'Branca'}</Text>
+                <BeltStrip belt={profile?.beltColor} degree={profile?.beltDegree || 0} />
               </View>
-              <View style={styles.divider} />
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Graus</Text>
-                <Text style={styles.infoValue}>{profile?.beltDegree || 0} graus</Text>
-              </View>
+              <Info label="Graus" value={`${profile?.beltDegree || 0}º grau`} mono last />
             </View>
-          </View>
+          </>
         )}
 
-        <View style={styles.actionSection}>
-          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-            <Text style={styles.logoutBtnText}>Sair da Conta</Text>
-          </TouchableOpacity>
-        </View>
+        <Button label="Sair da conta" icon={LogOut} variant="danger" onPress={handleLogout} style={{ marginTop: 24 }} />
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
+  );
+}
+
+function Info({ label, value, last, mono }: { label: string; value?: string; last?: boolean; mono?: boolean }) {
+  return (
+    <View style={[styles.infoRow, !last && styles.divider]}>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={[styles.infoValue, mono && { fontFamily: Fonts.mono, fontSize: 13 }]} numberOfLines={1}>{value}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.black },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { padding: 24, paddingTop: 40, paddingBottom: 16 },
-  title: { fontSize: 32, color: Colors.text, fontWeight: 'bold' },
   scroll: { flex: 1, paddingHorizontal: 20 },
-  
-  avatarSection: {
-    alignItems: 'center',
-    marginVertical: 24,
-  },
-  avatarPlaceholder: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: Colors.card2,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: Colors.gold,
-    marginBottom: 16,
-  },
-  avatarInitials: {
-    fontSize: 32,
-    color: Colors.gold,
-    fontWeight: 'bold',
-    letterSpacing: 2,
-  },
-  name: {
-    fontSize: 24,
-    color: Colors.text,
-    fontWeight: 'bold',
-  },
-  roleText: {
-    fontSize: 14,
-    color: Colors.muted,
-    marginTop: 4,
-    fontWeight: '600',
-  },
-
-  infoSection: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    color: Colors.text,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    paddingHorizontal: 4,
-  },
-  infoCard: {
-    backgroundColor: Colors.card,
-    borderColor: Colors.border,
-    borderWidth: 1,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 16,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: Colors.border,
-    marginHorizontal: 16,
-  },
-  infoLabel: {
-    color: Colors.muted,
-    fontSize: 14,
-  },
-  infoValue: {
-    color: Colors.text,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-
-  actionSection: {
-    marginTop: 16,
-    marginBottom: 40,
-  },
-  logoutBtn: {
-    backgroundColor: 'rgba(232,75,75,0.1)',
-    borderColor: 'rgba(232,75,75,0.3)',
-    borderWidth: 1,
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  logoutBtnText: {
-    color: Colors.red,
-    fontWeight: 'bold',
-    fontSize: 15,
-  },
+  avatarSection: { alignItems: 'center', marginBottom: 24, gap: 8 },
+  name: { fontSize: 22, color: Colors.text, fontWeight: 'bold', marginTop: 8 },
+  roleText: { ...Type.monoLabel, color: Colors.gold, textTransform: 'uppercase' },
+  sectionTitle: { ...Type.section, color: Colors.text, marginBottom: 12 },
+  infoCard: { backgroundColor: Colors.card, borderColor: Colors.border, borderWidth: 1, borderRadius: 20, overflow: 'hidden', marginBottom: 24 },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 16, padding: 16, minHeight: 56 },
+  divider: { borderBottomWidth: 1, borderBottomColor: Colors.border },
+  infoLabel: { color: Colors.muted, fontSize: 14 },
+  infoValue: { color: Colors.text, fontSize: 14, fontWeight: '600', flexShrink: 1 },
 });

@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { Text } from './ui';
 import { Colors } from '../../theme/colors';
 import { useFeedbackStore } from '../utils/notify';
 

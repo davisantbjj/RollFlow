@@ -1,36 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import { Text } from './ui';
 import { Colors } from '../../theme/colors';
 import { api } from '../services/api';
+import { BELT_COLORS, BELT_NAMES } from '../../theme/belts';
+import { Fonts, Type } from '../../theme/typography';
 import { useAuthStore } from '../../store/authStore';
-
-const BELT_COLORS: Record<string, string> = {
-  BRANCA: '#FFFFFF',
-  CINZA: '#A0A0A0',
-  AMARELA: '#FFD700',
-  LARANJA: '#FF8C00',
-  VERDE: '#008000',
-  AZUL: '#1A5EFF',
-  ROXA: '#6B21A8',
-  MARROM: '#8B4513',
-  PRETA: '#111111',
-  CORAL: '#EF4444', // Simplified to red
-  VERMELHA: '#DC2626',
-};
-
-const BELT_NAMES: Record<string, string> = {
-  BRANCA: 'Branca',
-  CINZA: 'Cinza',
-  AMARELA: 'Amarela',
-  LARANJA: 'Laranja',
-  VERDE: 'Verde',
-  AZUL: 'Azul',
-  ROXA: 'Roxa',
-  MARROM: 'Marrom',
-  PRETA: 'Preta',
-  CORAL: 'Coral',
-  VERMELHA: 'Vermelha',
-};
 
 export default function BeltCard({ studentId }: { studentId?: string }) {
   const { user } = useAuthStore();
@@ -191,31 +166,22 @@ const styles = StyleSheet.create({
   info: {
     alignItems: 'flex-end',
   },
-  title: {
-    fontSize: 22,
-    color: Colors.text,
-    letterSpacing: 1,
-    fontWeight: 'bold',
-  },
-  sub: {
-    fontSize: 11,
-    color: Colors.muted,
-    fontWeight: '600',
-  },
+  title: { ...Type.section, color: Colors.text },
+  sub: { fontFamily: Fonts.mono, fontSize: 11, color: Colors.muted },
   progressLabel: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 8,
   },
   progressText: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontFamily: Fonts.mono,
+    fontSize: 11,
     color: Colors.muted,
     letterSpacing: 0.8,
   },
   progressValue: {
+    fontFamily: Fonts.monoBold,
     fontSize: 12,
-    fontWeight: '700',
     color: Colors.gold,
     letterSpacing: 0.8,
   },

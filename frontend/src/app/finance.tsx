@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { Colors } from '../../theme/colors';
-import { Screen, Header, Loading, ErrorState, Empty, Button, Field, Chip, Badge, cardStyle } from '../components/ui';
+import { CreditCard, CircleCheck, Clock, TriangleAlert, Lock, Plus, Pencil, Trash2, DollarSign, Wallet } from 'lucide-react-native';
+import { Fonts, Type } from '../../theme/typography';
+import { Text, StatCard, Screen, Header, Loading, ErrorState, Empty, Button, Field, Chip, Badge, cardStyle } from '../components/ui';
 import { useAuthStore, isManagement } from '../../store/authStore';
 import { api } from '../services/api';
 import { notify, confirmAction, apiError } from '../utils/notify';
@@ -110,8 +112,11 @@ function MyFinance() {
           }
         >
           {blocked && (
-            <View style={styles.blockedBanner}>
-              <Text style={styles.blockedTitle}>Acesso bloqueado</Text>
+            <View style={styles.blockedBanner} accessibilityRole="alert">
+              <View style={styles.bannerHead}>
+                <Lock size={20} color={Colors.red} strokeWidth={2} />
+                <Text style={styles.blockedTitle}>Acesso bloqueado</Text>
+              </View>
               <Text style={styles.blockedText}>
                 Sua mensalidade está em atraso. Regularize o pagamento com a academia para liberar as aulas e o
                 restante do app. Depois, puxe a tela para baixo para atualizar.
@@ -121,12 +126,12 @@ function MyFinance() {
           {error ? (
             <ErrorState message={error} onRetry={load} />
           ) : !sub ? (
-            <Empty icon="💳" title="Você ainda não tem um plano" hint="Fale com a academia para contratar um plano." />
+            <Empty icon={CreditCard} title="Você ainda não tem um plano" hint="Fale com a academia para contratar um plano." />
           ) : (
             <View style={[cardStyle, { borderColor: status?.color }]}>
               <View style={styles.rowBetween}>
                 <Text style={styles.planName}>{sub.plan.name}</Text>
-                {status && <Badge label={status.label} color={status.color} />}
+                {status && <Badge label={status.label} color={status.color} icon={status.color === Colors.red ? TriangleAlert : CircleCheck} />}
               </View>
               <Text style={styles.planPrice}>
                 {money(sub.plan.price)} <Text style={styles.muted}>/ {(INTERVALS[sub.plan.interval] || sub.plan.interval).toLowerCase()}</Text>
@@ -139,7 +144,7 @@ function MyFinance() {
             <>
               <Text style={styles.section}>Histórico</Text>
               {(data?.payments || []).length === 0 ? (
-                <Empty title="Nenhuma cobrança ainda" />
+                <Empty icon={Wallet} title="Nenhuma cobrança ainda" />
               ) : (
                 data!.payments.map((p) => {
                   const paid = p.status === 'PAID';
@@ -149,7 +154,7 @@ function MyFinance() {
                     <View key={p.id} style={cardStyle}>
                       <View style={styles.rowBetween}>
                         <Text style={styles.amount}>{money(p.amount)}</Text>
-                        <Badge label={label} color={color} />
+                        <Badge label={label} color={color} icon={paid ? CircleCheck : p.isOverdue ? TriangleAlert : Clock} />
                       </View>
                       <Text style={styles.muted}>
                         Vence em {dateBR(p.dueDate)}
@@ -241,29 +246,30 @@ function ManagerFinance() {
           ) : (
             <>
               <View style={styles.cardsRow}>
-                <Summary label="Receita do mês" value={money(overview?.monthRevenue)} color={Colors.green} />
-                <Summary label="Em atraso" value={money(overview?.overdueTotal)} color={(overview?.overdueCount ?? 0) > 0 ? Colors.red : Colors.text} />
+                <Summary icon={DollarSign} label="Receita do mês" value={money(overview?.monthRevenue)} color={Colors.green} />
+                <Summary icon={TriangleAlert} label="Em atraso" value={money(overview?.overdueTotal)} color={(overview?.overdueCount ?? 0) > 0 ? Colors.red : Colors.text} />
               </View>
               <View style={styles.cardsRow}>
-                <Summary label="Atrasadas" value={String(overview?.overdueCount ?? 0)} />
-                <Summary label="Pendentes" value={String(overview?.pendingCount ?? 0)} />
+                <Summary icon={TriangleAlert} label="Atrasadas" value={String(overview?.overdueCount ?? 0)} />
+                <Summary icon={Clock} label="Pendentes" value={String(overview?.pendingCount ?? 0)} />
               </View>
 
               <Text style={styles.section}>Cobranças abertas</Text>
               {(overview?.payments || []).length === 0 ? (
-                <Empty icon="✅" title="Nenhuma cobrança pendente" hint="Quando houver mensalidades a receber, elas aparecem aqui." />
+                <Empty icon={CircleCheck} title="Nenhuma cobrança pendente" hint="Quando houver mensalidades a receber, elas aparecem aqui." />
               ) : (
                 overview!.payments.map((p) => (
                   <View key={p.id} style={[cardStyle, p.isOverdue && { borderColor: 'rgba(232,75,75,0.5)' }]}>
                     <View style={styles.rowBetween}>
                       <Text style={styles.amount} numberOfLines={1}>{p.user.name}</Text>
-                      <Badge label={p.isOverdue ? 'Atrasado' : 'Pendente'} color={p.isOverdue ? Colors.red : Colors.gold} />
+                      <Badge label={p.isOverdue ? 'Atrasado' : 'Pendente'} color={p.isOverdue ? Colors.red : Colors.gold} icon={p.isOverdue ? TriangleAlert : Clock} />
                     </View>
                     <Text style={styles.muted}>
                       {p.plan.name} · {money(p.amount)} · vence em {dateBR(p.dueDate)}
                     </Text>
                     <Button
                       label="Marcar como pago"
+                      icon={CircleCheck}
                       variant="green"
                       loading={payingId === p.id}
                       onPress={() => markPaid(p.id, p.user.name)}
@@ -282,13 +288,8 @@ function ManagerFinance() {
   );
 }
 
-function Summary({ label, value, color }: { label: string; value: string; color?: string }) {
-  return (
-    <View style={styles.summary}>
-      <Text style={[styles.summaryValue, color ? { color } : null]} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
-      <Text style={styles.summaryLabel}>{label}</Text>
-    </View>
-  );
+function Summary({ label, value, color, icon }: { label: string; value: string; color?: string; icon?: any }) {
+  return <StatCard label={label} value={value} color={color} icon={icon} small={value.length > 8} />;
 }
 
 // ---------------------------------------------------------------- Planos
@@ -360,7 +361,7 @@ function PlansSection({ plans, academyId, onChanged }: { plans: Plan[]; academyI
     <View>
       <View style={[styles.rowBetween, { marginTop: 16, marginBottom: 12 }]}>
         <Text style={[styles.section, { marginTop: 0, marginBottom: 0 }]}>Planos</Text>
-        {editing === null && <Button label="+ Novo plano" onPress={() => open()} />}
+        {editing === null && <Button label="Novo plano" icon={Plus} onPress={() => open()} />}
       </View>
 
       {editing !== null && (
@@ -396,8 +397,8 @@ function PlansSection({ plans, academyId, onChanged }: { plans: Plan[]; academyI
               {plan.description ? ` · ${plan.description}` : ''}
             </Text>
             <View style={styles.formActions}>
-              <Button label="Editar" variant="ghost" onPress={() => open(plan)} />
-              <Button label="Desativar" variant="danger" onPress={() => deactivate(plan)} />
+              <Button label="Editar" icon={Pencil} variant="ghost" onPress={() => open(plan)} />
+              <Button label="Desativar" icon={Trash2} variant="danger" onPress={() => deactivate(plan)} />
             </View>
           </View>
         ))
@@ -415,23 +416,18 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
   },
-  blockedTitle: { color: Colors.red, fontWeight: 'bold', fontSize: 16, marginBottom: 4 },
+  bannerHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  blockedTitle: { color: Colors.red, fontWeight: 'bold', fontSize: 16 },
   blockedText: { color: Colors.text, opacity: 0.85, lineHeight: 20 },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 6 },
-  muted: { color: Colors.muted, fontSize: 13, lineHeight: 19 },
-  section: { fontSize: 20, color: Colors.text, fontWeight: 'bold', marginTop: 12, marginBottom: 12 },
-  planName: { color: Colors.text, fontSize: 20, fontWeight: 'bold', flex: 1 },
-  planPrice: { color: Colors.gold, fontSize: 28, fontWeight: 'bold', marginBottom: 6 },
-  planGold: { color: Colors.gold, fontWeight: 'bold', fontSize: 16 },
+  muted: { color: Colors.muted, fontFamily: Fonts.mono, fontSize: 12, lineHeight: 20 },
+  section: { ...Type.section, color: Colors.text, marginTop: 12, marginBottom: 12 },
+  planName: { color: Colors.text, fontSize: 18, fontWeight: 'bold', flex: 1 },
+  planPrice: { color: Colors.gold, fontFamily: Fonts.monoBold, fontSize: 28, marginBottom: 8 },
+  planGold: { color: Colors.gold, fontFamily: Fonts.monoBold, fontSize: 16 },
   amount: { color: Colors.text, fontSize: 16, fontWeight: 'bold', flexShrink: 1 },
   cardsRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
-  summary: {
-    flex: 1, backgroundColor: Colors.card, borderColor: Colors.border, borderWidth: 1,
-    borderRadius: 20, paddingVertical: 16, paddingHorizontal: 12, alignItems: 'center',
-  },
-  summaryValue: { color: Colors.gold, fontSize: 24, fontWeight: 'bold' },
-  summaryLabel: { color: Colors.muted, fontSize: 12, fontWeight: '600', marginTop: 4 },
-  formTitle: { color: Colors.gold, fontSize: 18, fontWeight: 'bold', marginBottom: 14 },
+  formTitle: { color: Colors.gold, fontFamily: Fonts.display, fontSize: 24, letterSpacing: 1, marginBottom: 16 },
   chipLabel: { color: Colors.text, fontWeight: 'bold', fontSize: 13, marginBottom: 8 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
   formActions: { flexDirection: 'row', gap: 10, marginTop: 14, flexWrap: 'wrap' },

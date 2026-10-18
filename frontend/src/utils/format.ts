@@ -30,3 +30,13 @@ export const timeAgo = (iso: string) => {
   if (d < 7) return `há ${d} d`;
   return new Date(iso).toLocaleDateString('pt-BR');
 };
+
+export const ROLE_LABEL: Record<string, string> = {
+  MASTER: 'Administrador RollFlow',
+  ADMIN: 'Dono da academia',
+  PROFESSOR: 'Professor',
+  ALUNO: 'Aluno',
+  RESPONSAVEL: 'Responsável',
+};
+
+export const roleLabel = (role?: string | null) => (role ? ROLE_LABEL[role] || role : '');

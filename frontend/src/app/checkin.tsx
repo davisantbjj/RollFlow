@@ -1,5 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { Users, Lock, CircleCheck, Check } from 'lucide-react-native';
+import { Text, Screen, Header, Loading, Empty, Button, Badge } from '../components/ui';
+import { Type } from '../../theme/typography';
+import { beltName } from '../utils/format';
 import { Colors } from '../../theme/colors';
 import { api } from '../services/api';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -32,7 +36,7 @@ export default function Checkin() {
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  const isAdmin = user?.role === 'ADMIN' || user?.role === 'MASTER' || user?.role === 'PROFESSOR';
+  const isAdmin = user?.role === 'ADMIN' || user?.role === 'PROFESSOR';
 
   // Se não for admin, redireciona de volta
   useEffect(() => {
@@ -104,40 +108,31 @@ export default function Checkin() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.gold} />
-        </View>
-      </SafeAreaView>
+      <Screen>
+        <Header title="Chamada" subtitle={className as string} back />
+        <Loading />
+      </Screen>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>← Voltar</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Chamada</Text>
-        <Text style={styles.subtitle}>{className}</Text>
-      </View>
+    <Screen>
+      <Header title="Chamada" subtitle={className as string} back />
 
-      <ScrollView 
+      <ScrollView
         style={styles.scroll}
+        contentContainerStyle={{ paddingBottom: 32 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.gold} />}
       >
         <View style={styles.statsCard}>
-          <Text style={styles.statsText}>
-            <Text style={styles.statsHighlight}>{attendances.length}</Text> de {students.length} presentes hoje
-          </Text>
+          <Text style={styles.statsHighlight}>{attendances.length}/{students.length}</Text>
+          <Text style={styles.statsText}>presentes hoje</Text>
         </View>
 
-        <Text style={styles.sectionTitle}>Alunos Matriculados</Text>
+        <Text style={styles.sectionTitle}>Alunos matriculados</Text>
 
         {students.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyText}>Nenhum aluno matriculado nesta turma.</Text>
-          </View>
+          <Empty icon={Users} title="Nenhum aluno matriculado nesta turma" />
         ) : (
           students.map((student) => {
             const isPresent = attendances.some(a => a.studentId === student.id);
@@ -147,116 +142,51 @@ export default function Checkin() {
                 <View style={styles.studentInfo}>
                   <Text style={styles.studentName}>{student.name}</Text>
                   <Text style={styles.studentBelt}>
-                    {student.beltColor ? `Faixa ${student.beltColor}` : 'Sem faixa'} • {student.beltDegree || 0} graus
+                    {student.beltColor ? `Faixa ${beltName(student.beltColor)}` : 'Sem faixa'} · {student.beltDegree || 0} graus
                   </Text>
                   {student.isBlocked && (
-                    <Text style={styles.blockedText}>Pendência Financeira</Text>
+                    <View style={{ marginTop: 8, alignSelf: 'flex-start' }}>
+                      <Badge label="Pendência financeira" color={Colors.red} icon={Lock} />
+                    </View>
                   )}
                 </View>
 
                 {isPresent ? (
-                  <View style={styles.presentBadge}>
-                    <Text style={styles.presentText}>Presente ✓</Text>
-                  </View>
+                  <Badge label="Presente" color={Colors.green} icon={CircleCheck} />
                 ) : (
-                  <TouchableOpacity 
-                    style={[styles.checkinBtn, student.isBlocked && styles.checkinBtnDisabled]}
+                  <Button
+                    label="Dar presença"
+                    icon={Check}
                     onPress={() => handleCheckin(student.id, student.isBlocked)}
-                    disabled={actionLoading === student.id || student.isBlocked}
-                  >
-                    {actionLoading === student.id ? (
-                      <ActivityIndicator color={Colors.black} size="small" />
-                    ) : (
-                      <Text style={styles.checkinBtnText}>Dar Presença</Text>
-                    )}
-                  </TouchableOpacity>
+                    loading={actionLoading === student.id}
+                    disabled={student.isBlocked}
+                    style={{ minWidth: 148 }}
+                  />
                 )}
               </View>
             );
           })
         )}
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.black },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { padding: 24, paddingTop: 40, paddingBottom: 16 },
-  backBtn: { marginBottom: 16 },
-  backBtnText: { color: Colors.gold, fontSize: 16, fontWeight: 'bold' },
-  title: { fontSize: 32, color: Colors.text, fontWeight: 'bold' },
-  subtitle: { fontSize: 16, color: Colors.muted, marginTop: 4 },
   scroll: { flex: 1, paddingHorizontal: 20 },
-  
   statsCard: {
-    backgroundColor: Colors.card2,
-    borderColor: Colors.border,
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 24,
-    alignItems: 'center',
+    backgroundColor: Colors.card, borderColor: Colors.border, borderWidth: 1, borderRadius: 20,
+    padding: 16, marginBottom: 24, alignItems: 'center', gap: 4,
   },
-  statsText: { color: Colors.text, fontSize: 16, fontWeight: '600' },
-  statsHighlight: { color: Colors.gold, fontSize: 20, fontWeight: 'bold' },
-  
-  sectionTitle: { fontSize: 18, color: Colors.text, fontWeight: 'bold', marginBottom: 16 },
-  
+  statsText: { ...Type.monoLabel, color: Colors.muted, textTransform: 'uppercase' },
+  statsHighlight: { ...Type.kpi, color: Colors.gold },
+  sectionTitle: { ...Type.section, color: Colors.text, marginBottom: 12 },
   studentCard: {
-    backgroundColor: Colors.card,
-    borderColor: Colors.border,
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    backgroundColor: Colors.card, borderColor: Colors.border, borderWidth: 1, borderRadius: 20,
+    padding: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12,
   },
-  studentCardBlocked: {
-    borderColor: 'rgba(232,75,75,0.4)',
-    backgroundColor: 'rgba(232,75,75,0.05)',
-  },
-  studentInfo: { flex: 1, paddingRight: 12 },
+  studentCardBlocked: { borderColor: 'rgba(232,75,75,0.4)', backgroundColor: 'rgba(232,75,75,0.05)' },
+  studentInfo: { flex: 1 },
   studentName: { fontSize: 16, color: Colors.text, fontWeight: 'bold' },
-  studentBelt: { fontSize: 13, color: Colors.muted, marginTop: 4 },
-  blockedText: { color: Colors.red, fontSize: 12, fontWeight: 'bold', marginTop: 4 },
-  
-  checkinBtn: {
-    backgroundColor: Colors.gold,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    minWidth: 110,
-    alignItems: 'center',
-  },
-  checkinBtnDisabled: {
-    backgroundColor: Colors.border,
-    opacity: 0.5,
-  },
-  checkinBtnText: { color: Colors.black, fontWeight: 'bold', fontSize: 13 },
-  
-  presentBadge: {
-    backgroundColor: 'rgba(75,232,122,0.15)',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(75,232,122,0.3)',
-    minWidth: 110,
-    alignItems: 'center',
-  },
-  presentText: { color: Colors.green, fontWeight: 'bold', fontSize: 13 },
-
-  emptyCard: {
-    backgroundColor: Colors.card,
-    borderRadius: 16,
-    padding: 30,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  emptyText: { color: Colors.muted, fontSize: 15, textAlign: 'center' },
+  studentBelt: { fontSize: 12, color: Colors.muted, marginTop: 4 },
 });

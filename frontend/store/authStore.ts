@@ -62,6 +62,7 @@ export const useAuthStore = create<AuthState>()(
   )
 );
 
-export const isManagement = (role?: Role | null) => role === 'MASTER' || role === 'ADMIN';
-export const isStaff = (role?: Role | null) =>
-  role === 'MASTER' || role === 'ADMIN' || role === 'PROFESSOR';
+// No app, o MASTER não tem academia (usa o painel web): as telas de academia são só do dono e do professor.
+export const isMaster = (role?: Role | null) => role === 'MASTER';
+export const isManagement = (role?: Role | null) => role === 'ADMIN';
+export const isStaff = (role?: Role | null) => role === 'ADMIN' || role === 'PROFESSOR';
