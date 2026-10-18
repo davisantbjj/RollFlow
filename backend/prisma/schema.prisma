@@ -59,6 +59,7 @@ model Academy {
   phone     String?
   address   String?
   logoUrl   String?
+  blockAfterDays Int @default(5)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -201,6 +202,7 @@ model Payment {
   subscription   Subscription  @relation(fields: [subscriptionId], references: [id])
   amount         Float
   status         PaymentStatus @default(PENDING)
+  dueDate        DateTime      @default(now())
   paymentDate    DateTime?
   externalId     String?       // ID no gateway
   invoiceUrl     String?       // URL para pagamento (PIX/boleto)

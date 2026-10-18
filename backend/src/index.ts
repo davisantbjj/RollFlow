@@ -16,6 +16,9 @@ import planRoutes from './routes/plan';
 import paymentRoutes from './routes/payment';
 import progressionRoutes from './routes/progression';
 import evaluationRoutes from './routes/evaluation';
+import postRoutes from './routes/post';
+import dashboardRoutes from './routes/dashboard';
+import { startOverdueJob } from './jobs/overdueJob';
 import { errorHandler } from './middlewares/errorHandler';
 
 dotenv.config();
@@ -85,6 +88,8 @@ app.use('/plans', planRoutes);
 app.use('/payments', paymentRoutes);
 app.use('/progression', progressionRoutes);
 app.use('/evaluation', evaluationRoutes);
+app.use('/posts', postRoutes);
+app.use('/dashboard', dashboardRoutes);
 
 // Health check
 app.get('/health', (_req, res) => {
@@ -98,4 +103,5 @@ app.use(errorHandler);
 app.listen(PORT, () => {
   console.log(`🚀 RollFlow API running on http://localhost:${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  startOverdueJob();
 });

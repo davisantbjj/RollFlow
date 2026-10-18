@@ -41,7 +41,7 @@ export const updateAcademySchema = z.object({
 export const createClassSchema = z.object({
   name: z.string().min(2, 'Nome da turma deve ter pelo menos 2 caracteres'),
   description: z.string().optional(),
-  academyId: z.string().uuid('academyId deve ser um UUID válido'),
+  academyId: z.string().uuid('academyId deve ser um UUID válido').optional(),
   dayOfWeek: z.string().optional(),
   startTime: z.string().optional(),
   endTime: z.string().optional(),
@@ -68,7 +68,7 @@ export const createPlanSchema = z.object({
   interval: z.enum(['MONTHLY', 'QUARTERLY', 'SEMIANNUAL', 'YEARLY'], {
     error: 'Intervalo inválido',
   }),
-  academyId: z.string().uuid('academyId deve ser um UUID válido'),
+  academyId: z.string().uuid('academyId deve ser um UUID válido').optional(),
 });
 
 // ===== Subscription Schemas =====
@@ -121,3 +121,65 @@ export const promoteStudentSchema = z.object({
   toDegree: z.number().int().min(0).max(10),
 });
 
+
+// ===== Contrato "App" =====
+
+export const createPostBodySchema = z.object({
+  content: z.string().trim().min(1, 'Conteúdo não pode ser vazio'),
+  imageUrl: z.string().url('imageUrl inválida').optional().nullable(),
+  isPinned: z.boolean().optional(),
+});
+
+export const pinPostSchema = z.object({ isPinned: z.boolean() });
+
+export const commentSchema = z.object({
+  content: z.string().trim().min(1, 'Comentário não pode ser vazio'),
+});
+
+export const updatePlanSchema = z.object({
+  name: z.string().min(2).optional(),
+  description: z.string().nullable().optional(),
+  price: z.number().positive('Preço deve ser positivo').optional(),
+  interval: z.enum(['MONTHLY', 'QUARTERLY', 'SEMIANNUAL', 'YEARLY']).optional(),
+});
+
+export const updateClassSchema = z.object({
+  name: z.string().min(2).optional(),
+  description: z.string().nullable().optional(),
+  dayOfWeek: z.string().nullable().optional(),
+  startTime: z.string().nullable().optional(),
+  endTime: z.string().nullable().optional(),
+  maxStudents: z.number().int().positive().nullable().optional(),
+});
+
+export const addTeacherSchema = z.object({
+  teacherId: z.string().uuid('teacherId deve ser um UUID válido'),
+});
+
+export const createUserSchema = z.object({
+  name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
+  email: z.string().email('E-mail inválido'),
+  password: z.string().min(6, 'Senha deve ter pelo menos 6 caracteres'),
+  role: z.enum(['ADMIN', 'PROFESSOR', 'ALUNO', 'RESPONSAVEL'], { error: 'Role inválido' }),
+  phone: z.string().optional(),
+  guardianId: z.string().uuid().optional(),
+});
+
+export const updateUserSchema = z.object({
+  name: z.string().min(2).optional(),
+  phone: z.string().nullable().optional(),
+  role: z.enum(['ADMIN', 'PROFESSOR', 'ALUNO', 'RESPONSAVEL']).optional(),
+  guardianId: z.string().uuid().nullable().optional(),
+});
+
+export const blockUserSchema = z.object({ isBlocked: z.boolean() });
+
+export const classTeacherParamSchema = z.object({
+  classId: z.string().uuid('classId deve ser um UUID válido'),
+  teacherId: z.string().uuid('teacherId deve ser um UUID válido'),
+});
+
+export const classStudentParamSchema = z.object({
+  classId: z.string().uuid('classId deve ser um UUID válido'),
+  studentId: z.string().uuid('studentId deve ser um UUID válido'),
+});

@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { prisma } from '../index';
 import { AuthRequest } from '../middlewares/authMiddleware';
+import { canViewStudent } from '../utils/access';
 
 export class EvaluationController {
   static async createEvaluation(req: AuthRequest, res: Response): Promise<void> {
@@ -44,7 +45,7 @@ export class EvaluationController {
 
     try {
       // Access control: only MASTER, ADMIN, PROFESSOR or the student himself can view
-      if (req.user!.id !== studentId && !['MASTER', 'ADMIN', 'PROFESSOR'].includes(req.user!.role)) {
+      if (!(await canViewStudent(req, studentId))) {
         res.status(403).json({ error: 'Acesso negado' });
         return;
       }

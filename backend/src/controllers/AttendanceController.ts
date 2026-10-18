@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { prisma } from '../index';
 import { AuthRequest } from '../middlewares/authMiddleware';
+import { canViewStudent } from '../utils/access';
 
 export class AttendanceController {
   static async checkIn(req: AuthRequest, res: Response): Promise<void> {
@@ -40,6 +41,19 @@ export class AttendanceController {
       });
       if (!enrollment) {
         res.status(400).json({ error: 'Aluno não está matriculado nesta turma' });
+        return;
+      }
+
+      // Uma presença por aluno/turma/dia
+      const dayStart = new Date();
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(dayStart);
+      dayEnd.setDate(dayEnd.getDate() + 1);
+      const already = await prisma.attendance.findFirst({
+        where: { classId, studentId: targetStudentId, date: { gte: dayStart, lt: dayEnd } },
+      });
+      if (already) {
+        res.status(409).json({ error: 'Presença já registrada hoje' });
         return;
       }
 
@@ -83,6 +97,10 @@ export class AttendanceController {
     const studentId: string = (req.params.studentId as string) || req.user!.id;
 
     try {
+      if (!(await canViewStudent(req, studentId))) {
+        res.status(403).json({ error: 'Acesso negado' });
+        return;
+      }
       const attendances = await prisma.attendance.findMany({
         where: { studentId },
         include: {

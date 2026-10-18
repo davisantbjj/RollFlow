@@ -9,6 +9,6 @@ const router = Router();
 router.use(authenticate);
 
 router.post('/', authorizeRole(['MASTER', 'ADMIN', 'PROFESSOR']), validateBody(createEvaluationSchema), EvaluationController.createEvaluation);
-router.get('/student/:studentId', authorizeRole(['MASTER', 'ADMIN', 'PROFESSOR', 'ALUNO']), EvaluationController.listStudentEvaluations);
+router.get('/student/:studentId', authorizeRole(['MASTER', 'ADMIN', 'PROFESSOR', 'ALUNO', 'RESPONSAVEL']), EvaluationController.listStudentEvaluations);
 
 export default router;

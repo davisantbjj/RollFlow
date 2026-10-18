@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { prisma } from '../index';
 import { AuthRequest } from '../middlewares/authMiddleware';
+import { canViewStudent } from '../utils/access';
 import { BeltColor } from '@prisma/client';
 
 export class ProgressionController {
@@ -10,7 +11,7 @@ export class ProgressionController {
 
     try {
       // Access control
-      if (req.user!.id !== studentId && !['MASTER', 'ADMIN', 'PROFESSOR'].includes(req.user!.role)) {
+      if (!(await canViewStudent(req, studentId))) {
         res.status(403).json({ error: 'Acesso negado' });
         return;
       }
@@ -83,12 +84,13 @@ export class ProgressionController {
       }
 
       // 6. Calculate percentages
-      const attendProgress = Math.min(100, (attendances / activeRule.minAttendanceCount) * 100);
-      const timeProgress = Math.min(100, (elapsedMonths / activeRule.minMonths) * 100);
+      const ratio = (value: number, min: number) => (min > 0 ? Math.min(100, (value / min) * 100) : 100);
+      const attendProgress = ratio(attendances, activeRule.minAttendanceCount);
+      const timeProgress = ratio(elapsedMonths, activeRule.minMonths);
       
       let evalProgress = 100;
       if (activeRule.requiresEvaluation) {
-        evalProgress = Math.min(100, (avgScore / activeRule.minEvaluationScore) * 100);
+        evalProgress = ratio(avgScore, activeRule.minEvaluationScore);
       }
 
       const totalProgress = Math.round((attendProgress + timeProgress + evalProgress) / 3);

@@ -13,6 +13,6 @@ router.use(authenticate);
 router.post('/', authorizeRole(['MASTER', 'ADMIN', 'PROFESSOR', 'ALUNO']), validateBody(checkInSchema), AttendanceController.checkIn);
 router.get('/class/:classId', authorizeRole(['MASTER', 'ADMIN', 'PROFESSOR']), validateParams(classIdParamSchema), AttendanceController.listByClass);
 router.get('/history', authorizeRole(['MASTER', 'ADMIN', 'PROFESSOR', 'ALUNO']), AttendanceController.getStudentHistory);
-router.get('/history/:studentId', authorizeRole(['MASTER', 'ADMIN', 'PROFESSOR']), AttendanceController.getStudentHistory);
+router.get('/history/:studentId', authorizeRole(['MASTER', 'ADMIN', 'PROFESSOR', 'RESPONSAVEL']), AttendanceController.getStudentHistory);
 
 export default router;

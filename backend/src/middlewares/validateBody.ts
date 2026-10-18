@@ -14,7 +14,7 @@ export const validateBody = (schema: z.ZodType) => {
         message: issue.message,
       }));
       res.status(400).json({
-        error: 'Validation failed',
+        error: formatted[0]?.message ?? 'Dados inválidos',
         details: formatted,
       });
       return;
@@ -36,7 +36,7 @@ export const validateParams = (schema: z.ZodType) => {
         message: issue.message,
       }));
       res.status(400).json({
-        error: 'Invalid parameters',
+        error: formatted[0]?.message ?? 'Parâmetros inválidos',
         details: formatted,
       });
       return;
