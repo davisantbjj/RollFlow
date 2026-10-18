@@ -1,1 +1,0 @@
-- [Padrões de UI/estado](frontend-padroes.md) — notify/confirm, ui.tsx, sessão persistida, abas por papel

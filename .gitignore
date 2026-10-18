@@ -7,3 +7,10 @@ build/
 *.log
 .DS_Store
 .expo/
+
+# Arquivos do Claude / agentes e documentos internos (ficam só na máquina)
+.claude/
+CLAUDE.md
+AGENTS.md
+IMPLEMENTACAO.md
+implementation_plan.md
