@@ -11,14 +11,19 @@ export class AuthController {
       const user = await prisma.user.findUnique({ where: { email } });
 
       if (!user) {
-        res.status(401).json({ error: 'Invalid credentials' });
+        res.status(401).json({ error: 'E-mail ou senha incorretos' });
+        return;
+      }
+
+      if (user.isBlocked) {
+        res.status(403).json({ error: 'Conta bloqueada. Entre em contato com a academia.' });
         return;
       }
 
       const isValidPassword = await bcrypt.compare(password, user.password);
 
       if (!isValidPassword) {
-        res.status(401).json({ error: 'Invalid credentials' });
+        res.status(401).json({ error: 'E-mail ou senha incorretos' });
         return;
       }
 
@@ -34,23 +39,33 @@ export class AuthController {
           name: user.name,
           email: user.email,
           role: user.role,
-          academyId: user.academyId
+          academyId: user.academyId,
+          beltColor: user.beltColor,
+          beltDegree: user.beltDegree,
+          phone: user.phone,
         },
-        token
+        token,
       });
     } catch (error) {
-      res.status(500).json({ error: 'Internal server error' });
+      console.error('[AuthController.login]', error);
+      res.status(500).json({ error: 'Erro interno do servidor' });
     }
   }
 
   static async register(req: Request, res: Response): Promise<void> {
-    const { name, email, password, role, academyId } = req.body;
+    const { name, email, password, role, academyId, phone } = req.body;
 
     try {
-      const userExists = await prisma.user.findUnique({ where: { email } });
+      // Verify that the academy exists
+      const academy = await prisma.academy.findUnique({ where: { id: academyId } });
+      if (!academy) {
+        res.status(404).json({ error: 'Academia não encontrada' });
+        return;
+      }
 
+      const userExists = await prisma.user.findUnique({ where: { email } });
       if (userExists) {
-        res.status(400).json({ error: 'User already exists' });
+        res.status(409).json({ error: 'E-mail já cadastrado' });
         return;
       }
 
@@ -62,13 +77,21 @@ export class AuthController {
           email,
           password: hashedPassword,
           role,
-          academyId
-        }
+          academyId,
+          phone,
+        },
       });
 
-      res.status(201).json({ id: user.id, email: user.email, role: user.role });
+      res.status(201).json({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        academyId: user.academyId,
+      });
     } catch (error) {
-      res.status(500).json({ error: 'Internal server error' });
+      console.error('[AuthController.register]', error);
+      res.status(500).json({ error: 'Erro interno do servidor' });
     }
   }
 }

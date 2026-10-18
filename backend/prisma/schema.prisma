@@ -17,17 +17,56 @@ enum Role {
   RESPONSAVEL
 }
 
+enum BeltColor {
+  BRANCA
+  CINZA
+  AMARELA
+  LARANJA
+  VERDE
+  AZUL
+  ROXA
+  MARROM
+  PRETA
+  CORAL
+  VERMELHA
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  OVERDUE
+  CANCELED
+  SUSPENDED
+}
+
+enum PaymentStatus {
+  PAID
+  PENDING
+  FAILED
+  REFUNDED
+}
+
+enum PlanInterval {
+  MONTHLY
+  QUARTERLY
+  SEMIANNUAL
+  YEARLY
+}
+
 model Academy {
   id        String   @id @default(uuid())
   name      String
   cnpj      String?
+  phone     String?
+  address   String?
+  logoUrl   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users   User[]
-  classes Class[]
-  plans   Plan[]
-  posts   Post[]
+  users            User[]
+  classes          Class[]
+  plans            Plan[]
+  posts            Post[]
+  progressionRules ProgressionRule[]
 }
 
 model User {
@@ -36,6 +75,12 @@ model User {
   email    String @unique
   password String
   role     Role
+  phone    String?
+
+  // Belt progression
+  beltColor  BeltColor @default(BRANCA)
+  beltDegree Int       @default(0)
+  isBlocked  Boolean   @default(false)
 
   // Multi-tenant: Master pode ter null academyId, os demais precisam estar atrelados
   academyId String?
@@ -49,18 +94,27 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  classes       ClassTeacher[]
-  enrollments   Enrollment[]
-  attendances   Attendance[]
-  subscriptions Subscription[]
-  posts         Post[]
-  comments      Comment[]
+  classes              ClassTeacher[]
+  enrollments          Enrollment[]
+  attendances          Attendance[]
+  subscriptions        Subscription[]
+  posts                Post[]
+  comments             Comment[]
+  likes                Like[]
+  evaluationsGiven     Evaluation[] @relation("EvaluatorEvaluations")
+  evaluationsReceived  Evaluation[] @relation("StudentEvaluations")
+  beltHistoryPromotions BeltHistory[] @relation("PromoterHistory")
+  beltHistoryRecords    BeltHistory[] @relation("StudentHistory")
 }
 
 model Class {
   id          String  @id @default(uuid())
   name        String
   description String?
+  dayOfWeek   String? // e.g., 'SEGUNDA', 'TERCA', etc.
+  startTime   String? // e.g., '19:30'
+  endTime     String? // e.g., '21:00'
+  maxStudents Int?
 
   academyId String
   academy   Academy @relation(fields: [academyId], references: [id])
@@ -88,25 +142,34 @@ model Enrollment {
   studentId String
   student   User   @relation(fields: [studentId], references: [id])
 
+  enrolledAt DateTime @default(now())
+
   @@id([classId, studentId])
 }
 
 model Attendance {
-  id        String @id @default(uuid())
+  id        String   @id @default(uuid())
+  date      DateTime @default(now())
+  present   Boolean  @default(true)
+
   classId   String
   class     Class  @relation(fields: [classId], references: [id])
   studentId String
   student   User   @relation(fields: [studentId], references: [id])
+
+  createdAt DateTime @default(now())
 }
 
 model Plan {
-  id          String  @id @default(uuid())
+  id          String       @id @default(uuid())
   name        String
   description String?
   price       Float
-  interval    String // e.g., 'MONTHLY', 'QUARTERLY', 'YEARLY'
-  academyId   String
-  academy     Academy @relation(fields: [academyId], references: [id])
+  interval    PlanInterval @default(MONTHLY)
+  isActive    Boolean      @default(true)
+
+  academyId String
+  academy   Academy @relation(fields: [academyId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -115,13 +178,16 @@ model Plan {
 }
 
 model Subscription {
-  id      String   @id @default(uuid())
+  id      String             @id @default(uuid())
   userId  String
-  user    User     @relation(fields: [userId], references: [id])
+  user    User               @relation(fields: [userId], references: [id])
   planId  String
-  plan    Plan     @relation(fields: [planId], references: [id])
-  status  String // 'ACTIVE', 'OVERDUE', 'CANCELED'
-  dueDate DateTime // Next payment date
+  plan    Plan               @relation(fields: [planId], references: [id])
+  status  SubscriptionStatus @default(ACTIVE)
+  dueDate DateTime           // Next payment date
+
+  externalId    String? // ID no gateway de pagamento
+  paymentMethod String? // PIX, BOLETO, CARTAO
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -130,12 +196,14 @@ model Subscription {
 }
 
 model Payment {
-  id             String       @id @default(uuid())
+  id             String        @id @default(uuid())
   subscriptionId String
-  subscription   Subscription @relation(fields: [subscriptionId], references: [id])
+  subscription   Subscription  @relation(fields: [subscriptionId], references: [id])
   amount         Float
-  status         String // 'PAID', 'PENDING', 'FAILED'
+  status         PaymentStatus @default(PENDING)
   paymentDate    DateTime?
+  externalId     String?       // ID no gateway
+  invoiceUrl     String?       // URL para pagamento (PIX/boleto)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -144,6 +212,9 @@ model Payment {
 model Post {
   id        String  @id @default(uuid())
   content   String
+  imageUrl  String?
+  isPinned  Boolean @default(false)
+
   authorId  String
   author    User    @relation(fields: [authorId], references: [id])
   academyId String
@@ -153,6 +224,7 @@ model Post {
   updatedAt DateTime @updatedAt
 
   comments Comment[]
+  likes    Like[]
 }
 
 model Comment {
@@ -164,4 +236,67 @@ model Comment {
   author   User   @relation(fields: [authorId], references: [id])
 
   createdAt DateTime @default(now())
+}
+
+model Like {
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+  postId String
+  post   Post   @relation(fields: [postId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@id([userId, postId])
+}
+
+// ===== Progression System =====
+
+model Evaluation {
+  id        String @id @default(uuid())
+
+  evaluatorId String
+  evaluator   User   @relation("EvaluatorEvaluations", fields: [evaluatorId], references: [id])
+  studentId   String
+  student     User   @relation("StudentEvaluations", fields: [studentId], references: [id])
+
+  technique  Int // 1-5
+  discipline Int // 1-5
+  evolution  Int // 1-5
+  notes      String?
+
+  createdAt DateTime @default(now())
+}
+
+model ProgressionRule {
+  id        String @id @default(uuid())
+
+  academyId String
+  academy   Academy @relation(fields: [academyId], references: [id])
+
+  beltColor          BeltColor
+  minAttendanceCount Int       @default(100)  // Minimum number of classes
+  minMonths          Int       @default(12)   // Minimum time at current belt
+  minEvaluationScore Float     @default(3.0)  // Minimum average evaluation (1-5)
+  requiresEvaluation Boolean   @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([academyId, beltColor])
+}
+
+model BeltHistory {
+  id String @id @default(uuid())
+
+  studentId  String
+  student    User      @relation("StudentHistory", fields: [studentId], references: [id])
+  promotedBy String?
+  promoter   User?     @relation("PromoterHistory", fields: [promotedBy], references: [id])
+
+  fromBelt   BeltColor
+  toBelt     BeltColor
+  fromDegree Int       @default(0)
+  toDegree   Int       @default(0)
+
+  promotedAt DateTime @default(now())
 }

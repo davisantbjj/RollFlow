@@ -6,30 +6,79 @@ export class UserController {
   static async list(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { role, academyId } = req.user!;
-      let users;
+      const { search, filterRole } = req.query;
 
-      if (role === 'MASTER') {
-        users = await prisma.user.findMany();
-      } else {
-        users = await prisma.user.findMany({ where: { academyId } });
+      const where: any = {};
+
+      // Multi-tenant isolation
+      if (role !== 'MASTER') {
+        where.academyId = academyId;
       }
+
+      // Search filter
+      if (search && typeof search === 'string') {
+        where.OR = [
+          { name: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+        ];
+      }
+
+      // Role filter
+      if (filterRole && typeof filterRole === 'string') {
+        where.role = filterRole;
+      }
+
+      const users = await prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          phone: true,
+          beltColor: true,
+          beltDegree: true,
+          isBlocked: true,
+          academyId: true,
+          createdAt: true,
+        },
+        orderBy: { name: 'asc' },
+      });
 
       res.json(users);
     } catch (error) {
-      res.status(500).json({ error: 'Internal server error' });
+      console.error('[UserController.list]', error);
+      res.status(500).json({ error: 'Erro interno do servidor' });
     }
   }
 
   static async getProfile(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+      const user = await prisma.user.findUnique({
+        where: { id: req.user!.id },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          phone: true,
+          beltColor: true,
+          beltDegree: true,
+          isBlocked: true,
+          academyId: true,
+          academy: { select: { id: true, name: true } },
+          createdAt: true,
+        },
+      });
+
       if (!user) {
-        res.status(404).json({ error: 'User not found' });
+        res.status(404).json({ error: 'Usuário não encontrado' });
         return;
       }
       res.json(user);
     } catch (error) {
-      res.status(500).json({ error: 'Internal server error' });
+      console.error('[UserController.getProfile]', error);
+      res.status(500).json({ error: 'Erro interno do servidor' });
     }
   }
 }
