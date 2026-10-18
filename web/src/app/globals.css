@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0a0a0a;
+  --color-ink: #111318;
+  --color-panel: #111318;
+  --color-card: #181c24;
+  --color-card2: #1e2330;
+  --color-line: #2a2f3d;
+  --color-gold: #e8b84b;
+  --color-gold2: #f5d07a;
+  --color-danger: #e84b4b;
+  --color-info: #4b7ee8;
+  --color-ok: #4be87a;
+  --color-fg: #eef0f5;
+  --color-dim: #9aa1b2;
+  --color-muted: #6b7280;
+  --font-sans: var(--font-syne), system-ui, sans-serif;
+  --font-display: var(--font-bebas), Impact, sans-serif;
+  --font-mono: var(--font-jb), ui-monospace, monospace;
+}
+
+html, body { background: var(--color-bg); color: var(--color-fg); }
+body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+
+*:focus-visible { outline: 2px solid var(--color-gold); outline-offset: 2px; }
+::selection { background: rgba(232, 184, 75, 0.35); }
+
+input, select, textarea { color-scheme: dark; }
+
+@keyframes rf-pop { from { opacity: 0; transform: translateY(6px) scale(.98); } to { opacity: 1; transform: none; } }
+.rf-pop { animation: rf-pop .16s ease-out; }
+@keyframes rf-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .rf-pop { animation: none; }
+}
+
+.recharts-tooltip-wrapper { outline: none; }
+
+.skeleton { background: var(--color-card2); border-radius: 12px; animation: rf-pulse 1.4s ease-in-out infinite; }
+@keyframes rf-pulse { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+button:not(:disabled):active { transform: scale(0.98); }
+button, a { transition-duration: 160ms; }
