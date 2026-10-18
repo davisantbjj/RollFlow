@@ -1,34 +1,121 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { Colors } from '../../theme/colors';
+import { api } from '../services/api';
+import { useAuthStore } from '../../store/authStore';
+
+const BELT_COLORS: Record<string, string> = {
+  BRANCA: '#FFFFFF',
+  CINZA: '#A0A0A0',
+  AMARELA: '#FFD700',
+  LARANJA: '#FF8C00',
+  VERDE: '#008000',
+  AZUL: '#1A5EFF',
+  ROXA: '#6B21A8',
+  MARROM: '#8B4513',
+  PRETA: '#111111',
+  CORAL: '#EF4444', // Simplified to red
+  VERMELHA: '#DC2626',
+};
+
+const BELT_NAMES: Record<string, string> = {
+  BRANCA: 'Branca',
+  CINZA: 'Cinza',
+  AMARELA: 'Amarela',
+  LARANJA: 'Laranja',
+  VERDE: 'Verde',
+  AZUL: 'Azul',
+  ROXA: 'Roxa',
+  MARROM: 'Marrom',
+  PRETA: 'Preta',
+  CORAL: 'Coral',
+  VERMELHA: 'Vermelha',
+};
 
 export default function BeltCard() {
+  const { user } = useAuthStore();
+  const [progression, setProgression] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchProgression = async () => {
+      try {
+        if (!user?.id) return;
+        const res = await api.get(`/progression/student/${user.id}`);
+        setProgression(res.data);
+      } catch (error) {
+        console.error('Error fetching progression:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProgression();
+  }, [user?.id]);
+
+  if (loading) {
+    return (
+      <View style={[styles.card, { alignItems: 'center', justifyContent: 'center', height: 160 }]}>
+        <ActivityIndicator color={Colors.gold} />
+      </View>
+    );
+  }
+
+  if (!progression) {
+    return null; // Don't show if not loaded or failed
+  }
+
+  const currentBelt = progression.currentBelt || 'BRANCA';
+  const beltColorHex = BELT_COLORS[currentBelt] || '#FFFFFF';
+  const beltName = BELT_NAMES[currentBelt] || 'Branca';
+  const currentDegree = progression.currentDegree || 0;
+  
+  // Render degrees (typically up to 4 degrees on the black bar)
+  const renderDegrees = () => {
+    const degrees = [];
+    for (let i = 1; i <= 4; i++) {
+      degrees.push(
+        <View key={i} style={[styles.grau, i > currentDegree && styles.emptyGrau]} />
+      );
+    }
+    return degrees;
+  };
+
+  const progressTotal = progression.progress?.total || 0;
+  const isReady = progression.isReady;
+
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, isReady && styles.cardReady]}>
       <View style={styles.row}>
         <View style={styles.visual}>
-          <View style={styles.strip}>
-            <View style={styles.stripEnd} />
+          <View style={[styles.strip, { backgroundColor: beltColorHex, shadowColor: beltColorHex }]}>
+            {/* The tip is usually black for all belts except black belt which has red tip */}
+            <View style={[styles.stripEnd, currentBelt === 'PRETA' ? { backgroundColor: '#DC2626' } : {}]} />
           </View>
           <View style={styles.graus}>
-            <View style={styles.grau} />
-            <View style={styles.grau} />
-            <View style={styles.grau} />
-            <View style={[styles.grau, styles.emptyGrau]} />
+            {renderDegrees()}
           </View>
         </View>
         <View style={styles.info}>
-          <Text style={styles.title}>Faixa Azul</Text>
-          <Text style={styles.sub}>3º Grau · 4 anos</Text>
+          <Text style={styles.title}>Faixa {beltName}</Text>
+          <Text style={styles.sub}>
+            {currentDegree}º Grau · {progression.stats?.elapsedMonths || 0} meses
+          </Text>
         </View>
       </View>
       
       <View style={styles.progressLabel}>
-        <Text style={styles.progressText}>PROGRESSÃO P/ FAIXA ROXA</Text>
-        <Text style={styles.progressValue}>72%</Text>
+        <Text style={styles.progressText}>
+          {isReady ? 'PRONTO PARA GRADUAÇÃO' : 'PROGRESSÃO P/ PRÓXIMO GRAU'}
+        </Text>
+        <Text style={[styles.progressValue, isReady && { color: Colors.green }]}>{progressTotal}%</Text>
       </View>
       <View style={styles.progressBar}>
-        <View style={styles.progressFill} />
+        <View style={[
+          styles.progressFill, 
+          { width: `${progressTotal}%` },
+          isReady && { backgroundColor: Colors.green }
+        ]} />
       </View>
     </View>
   );
@@ -45,6 +132,10 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     overflow: 'hidden',
   },
+  cardReady: {
+    borderColor: Colors.green,
+    backgroundColor: 'rgba(75, 232, 122, 0.05)',
+  },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -60,10 +151,8 @@ const styles = StyleSheet.create({
     width: 48,
     height: 14,
     borderRadius: 4,
-    backgroundColor: '#1a5eff',
     position: 'relative',
     elevation: 4,
-    shadowColor: '#1a5eff',
     shadowOpacity: 0.4,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 2 },
@@ -137,7 +226,6 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    width: '72%',
     backgroundColor: Colors.gold,
     borderRadius: 99,
   },
